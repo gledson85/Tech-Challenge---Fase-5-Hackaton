@@ -393,9 +393,12 @@ Conforme definido no enunciado:
 ## 11. Referências
 
 - [Metodologia STRIDE - Microsoft](https://learn.microsoft.com/en-us/azure/security/develop/threat-modeling-tool-threats)
-- [Florence-2 - Microsoft](https://huggingface.co/microsoft/Florence-2-large)
-- [Ultralytics YOLOv8](https://docs.ultralytics.com/)
-- [Claude API - Anthropic](https://docs.anthropic.com/en/docs/about-claude/models)
+- [Florence-2-large - Microsoft (Hugging Face)](https://huggingface.co/microsoft/Florence-2-large)
+- [Claude API - Models (Anthropic)](https://platform.claude.com/docs/en/build-with-claude/models)
+- [Claude Vision API (Anthropic)](https://platform.claude.com/docs/en/build-with-claude/vision)
 - [AWS Well-Architected Framework - Security Pillar](https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/welcome.html)
-- [Azure Security Benchmark](https://learn.microsoft.com/en-us/security/benchmark/azure/overview)
+- [Azure Security Benchmark - Microsoft](https://learn.microsoft.com/en-us/security/benchmark/azure/overview)
 - [Supervision - Roboflow](https://supervision.roboflow.com/)
+- [fpdf2 - Geração de PDF](https://py-pdf.github.io/fpdf2/)
+- [Google Colab](https://colab.google/)
+- [Ultralytics YOLO](https://docs.ultralytics.com/)

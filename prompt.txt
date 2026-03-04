@@ -1,0 +1,155 @@
+Você é um assistente especializado em segurança de software e IA. Preciso da sua ajuda para desenvolver um projeto acadêmico da FIAP (Pós Tech - Software Security, Fase 5 - Hackaton).
+
+## Objetivo do Projeto
+
+Desenvolver um MVP que recebe uma imagem PNG de um diagrama de arquitetura de software (AWS ou Azure) e gera automaticamente um Relatório de Modelagem de Ameaças baseado na metodologia STRIDE.
+
+## Pipeline (4 passos)
+
+O sistema deve executar os seguintes passos em sequência:
+
+**Passo 1 — Identificar provedor cloud:**
+- Receber a imagem e identificar se é AWS ou Azure
+- Usar Claude Vision API (multimodal) para análise visual de logotipos, cores e nomenclatura
+- Output: string "AWS" ou "Azure"
+
+**Passo 2 — Detectar componentes:**
+- Usar Florence-2 (microsoft/Florence-2-large, pré-treinado, 900M parâmetros) para detecção zero-shot de componentes visuais, gerando bounding boxes
+- Recortar cada região detectada (crop) e enviar ao Claude Vision API para classificação refinada com nome exato do serviço cloud
+- Output: lista JSON de componentes com nome, classe genérica, bounding box e provedor
+
+**Passo 3 — Análise STRIDE:**
+- Para cada componente detectado, usar Claude API para gerar análise STRIDE completa
+- Cada componente recebe análise nas 6 categorias: Spoofing, Tampering, Repudiation, Information Disclosure, Denial of Service, Elevation of Privilege
+- Incluir nível de risco (Alto/Médio/Baixo) e contramedidas específicas do provedor
+- Referenciar boas práticas (AWS Well-Architected / Azure Security Benchmark)
+
+**Passo 4 — Gerar relatório:**
+- JSON estruturado (para integração)
+- PDF formatado (para apresentação): capa, tabela de componentes, análise STRIDE detalhada, resumo executivo
+
+## Classes de Detecção
+
+O sistema deve reconhecer estas categorias de componentes:
+
+- waf_firewall: AWS WAF, AWS Shield, Azure Firewall
+- cdn: Amazon CloudFront, Azure CDN
+- load_balancer: ALB, NLB, Azure Load Balancer
+- vpc_vnet: VPC, VNet, Subnet
+- compute: EC2, SEI/SIP, App Service, VM
+- auto_scaling: Auto Scaling Group, VMSS
+- orchestrator: Logic Apps, Step Functions, Lambda
+- database: RDS, Aurora, Azure SQL, Cosmos DB
+- cache: ElastiCache, Azure Cache for Redis
+- storage: S3, EFS, Azure Blob, NFS
+- api_gateway: API Gateway, Azure API Management
+- developer_portal: Developer Portal
+- web_service: REST, SOAP, SaaS Service
+- auth_identity: IAM, Microsoft Entra, Cognito
+- kms_encryption: AWS KMS, Azure Key Vault
+- monitoring: CloudWatch, CloudTrail, Azure Monitor
+- backup: AWS Backup, Azure Backup
+- messaging: SES, SQS, SNS, Azure Service Bus
+- user_actor: Usuário, Developer, Client
+
+## Arquiteturas de Teste
+
+O sistema será testado com 2 imagens (disponíveis no repositório como "arquitetura 1.png" e "arquitetura 2.png"):
+
+**Arquitetura 1 — AWS:**
+- Camada externa: Usuários SEI → AWS Shield → Amazon CloudFront → AWS WAF
+- AWS Cloud > Region São Paulo > VPC com 3 Availability Zones (A, B, C)
+- Cada AZ: Public Subnet (ALB) + Private Subnet (Auto Scaling SEI/SIP) + Private Subnet (storage)
+- AZ A: EFS Multi-AZ + RDS Primary
+- AZ B: RDS Secondary + ElastiCache Multiaz
+- AZ C: Solr com Auto Scaling
+- Serviços auxiliares: CloudTrail, KMS, Backup, CloudWatch, SES
+
+**Arquitetura 2 — Azure:**
+- Atores: Usuário (HTTP) e Developer
+- Microsoft Entra (autenticação)
+- API Management (Resource Group): API Gateway, Developer Portal, Logic Apps
+- Backend Systems: Azure Services, SaaS Services, Web Services (REST, SOAP)
+- Fluxo: 1 (User HTTP) → 2 (Entra Auth) → 3 (API Gateway) → 4 (Logic Apps) → 5 (Backend)
+
+## Stack Tecnológica
+
+- Ambiente: Google Colab Pro (GPU T4/A100)
+- Linguagem: Python 3.10+
+- Storage: Google Drive
+- Bibliotecas: transformers, anthropic, supervision, fpdf2, torch, Pillow, matplotlib
+- Modelos: Florence-2-large (Microsoft) + Claude Sonnet 4.6 (Anthropic)
+
+## Estrutura de Notebooks
+
+O projeto usa 3 notebooks no Google Colab:
+
+**01_component_detection.ipynb** (GPU T4/A100):
+1. Montar Google Drive e carregar imagem
+2. Passo 1: Claude Vision identifica provedor (AWS/Azure)
+3. Passo 2a: Florence-2 detecta componentes (bounding boxes)
+4. Passo 2b: Claude Vision classifica cada crop com nome exato do serviço
+5. Salvar JSON com componentes detectados
+6. Visualizar bboxes com supervision
+Output: outputs/detections/componentes_arquitetura_X.json
+
+**02_stride_analysis.ipynb** (sem GPU):
+1. Carregar JSON de componentes
+2. Montar prompt STRIDE contextualizado por componente
+3. Claude API gera análise STRIDE completa
+4. Gerar contramedidas específicas
+5. Consolidar JSON
+6. Gerar PDF com fpdf2
+Output: outputs/reports/stride_arquitetura_X.json e .pdf
+
+**03_demo.ipynb** (GPU T4):
+1. Pipeline end-to-end completo
+2. Executar para as 2 arquiteturas de teste
+3. Visualização: imagem com bboxes + resumo do relatório
+4. Métricas: tempo, componentes detectados, ameaças identificadas
+Output: Relatórios completos (JSON + PDF)
+
+## Estrutura de Pastas
+
+```
+Tech-Challenge---Fase-5-Hackaton/
+├── README.md
+├── IADT - Fase 5 - Hackaton.pdf    # Enunciado
+├── arquitetura 1.png               # Teste AWS
+├── arquitetura 2.png               # Teste Azure
+├── notebooks/
+│   ├── 01_component_detection.ipynb
+│   ├── 02_stride_analysis.ipynb
+│   └── 03_demo.ipynb
+└── outputs/
+    ├── detections/
+    └── reports/
+```
+
+Google Drive:
+```
+MyDrive/hackaton-stride/
+├── notebooks/
+├── test_images/
+└── outputs/
+    ├── detections/
+    └── reports/
+```
+
+## Backlog Opcional (se sobrar tempo)
+
+- Construir dataset de imagens de diagramas de arquitetura
+- Anotar no Roboflow com as classes definidas
+- Fine-tuning YOLOv8
+- Avaliar com métricas: mAP, Precision, Recall, F1-Score
+- Comparar modelo treinado vs. abordagem zero-shot
+
+## Entregáveis
+
+- Documentação (README + notebooks)
+- Vídeo de até 15 minutos
+- Link do GitHub
+
+## Instruções
+
+Comece gerando os notebooks na ordem (01, 02, 03), todos preparados para rodar no Google Colab Pro. Cada notebook deve ser autocontido: instalar dependências, montar Drive, e executar seu passo do pipeline. Use código Python limpo, bem comentado em português, e com tratamento de erros adequado.
