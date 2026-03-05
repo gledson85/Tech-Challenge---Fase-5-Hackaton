@@ -84,8 +84,9 @@ O sistema será testado com 2 imagens (disponíveis no repositório como "arquit
 - Ambiente: Google Colab Pro (GPU T4/A100)
 - Linguagem: Python 3.11
 - Storage: Google Drive
-- Bibliotecas: transformers, anthropic, supervision, fpdf2, torch, Pillow, matplotlib, timm, einops, flash_attn
-- Modelos: Florence-2-large (Microsoft) + Claude Sonnet 4.6 (Anthropic)
+- Bibliotecas: transformers, anthropic, supervision, fpdf2, torch, Pillow, matplotlib, timm, einops
+- Nota: flash_attn (Flash Attention) não é utilizada — a compilação falha no Colab por incompatibilidade com CUDA. Florence-2 funciona normalmente sem ela, usando atenção padrão do PyTorch.
+- Modelos: Florence-2-large-ft (Microsoft, fine-tuned) + Claude Sonnet 4.6 (Anthropic)
 
 ## Estrutura de Notebooks
 
@@ -94,7 +95,7 @@ O projeto usa 3 notebooks no Google Colab:
 **01_component_detection.ipynb** (GPU T4/A100):
 1. Montar Google Drive e carregar imagem
 2. Passo 1: Claude Vision identifica provedor (AWS/Azure)
-3. Passo 2a: Florence-2 detecta componentes (5 estratégias: OCR, Phrase Grounding, Region Proposal, Dense Caption, OD)
+3. Passo 2a: Florence-2-large-ft detecta componentes (5 estratégias: OCR, Phrase Grounding, Region Proposal, Dense Caption, OD) + tiling 3x3 com 20% overlap
 4. Passo 2b: Claude Vision classifica cada crop com nome exato do serviço
 5. Salvar JSON com componentes detectados
 6. Visualizar bboxes com supervision

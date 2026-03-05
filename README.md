@@ -68,11 +68,17 @@ O sistema recebe uma imagem de diagrama de arquitetura e identifica automaticame
 
 Dois modelos trabalham em conjunto:
 
-**Florence-2** (Microsoft, pré-treinado):
-- Modelo de visão computacional com 900M de parâmetros
-- Realiza detecção zero-shot: identifica regiões de interesse na imagem sem treinamento adicional
-- Gera bounding boxes ao redor de cada componente detectado
-- Prompt textual específico para componentes de arquitetura cloud
+**Florence-2-large-ft** (Microsoft, pré-treinado fine-tuned):
+- Modelo de visão computacional com 770M de parâmetros (versão fine-tuned para melhor detecção)
+- Realiza detecção zero-shot com 5 estratégias complementares:
+  - `OCR_WITH_REGION`: detecta textos (nomes dos serviços) com bounding boxes
+  - `CAPTION_TO_PHRASE_GROUNDING`: localiza termos específicos de componentes cloud (1 serviço por query)
+  - `REGION_PROPOSAL`: propostas genéricas de regiões de interesse
+  - `DENSE_REGION_CAPTION`: regiões com legenda densa
+  - `OD`: detecção de objetos (complementar)
+- Tiling 3x3 com 20% de overlap: repete todas as estratégias em cada tile para capturar componentes menores
+- Filtros relaxados para diagramas técnicos (min_area_ratio=0.0005, max_area_ratio=0.8, min_size=5px)
+- NMS (Non-Maximum Suppression) com IoU > 0.5 para remover duplicatas
 
 **Claude Vision API** (classificação refinada):
 - Recebe os recortes (crops) de cada bounding box detectado pelo Florence-2
@@ -244,7 +250,7 @@ Componentes presentes:
 | Item | Tecnologia |
 |------|-----------|
 | **Ambiente** | Google Colab Pro (GPU T4/A100) |
-| **Linguagem** | Python 3.10+ |
+| **Linguagem** | Python 3.11 |
 | **Storage** | Google Drive |
 | **Versionamento** | GitHub |
 
@@ -256,15 +262,19 @@ Componentes presentes:
 | `anthropic` | latest | Claude API (classificação + STRIDE) |
 | `supervision` | latest | Visualização de bounding boxes |
 | `fpdf2` | latest | Geração de relatório PDF |
+| `timm` | latest | Dependência do Florence-2 (modelos de visão) |
+| `einops` | latest | Dependência do Florence-2 (operações tensoriais) |
 | `torch` | latest | Backend para Florence-2 (pré-instalado no Colab) |
 | `Pillow` | latest | Manipulação de imagens (pré-instalado no Colab) |
 | `matplotlib` | latest | Visualizações (pré-instalado no Colab) |
+
+> **Nota sobre `flash_attn`**: A biblioteca Flash Attention (`flash_attn`) seria utilizada para acelerar o mecanismo de atenção do Florence-2, reduzindo o consumo de memória GPU e aumentando a velocidade de inferência. Porém, a compilação falha no ambiente Google Colab devido a incompatibilidades com a versão do CUDA/compilador disponível. O Florence-2 funciona normalmente sem ela, utilizando a implementação padrão de atenção do PyTorch.
 
 ### 6.3 Modelos de IA
 
 | Modelo | Provedor | Parâmetros | Uso no Projeto |
 |--------|----------|-----------|----------------|
-| **Florence-2-large** | Microsoft | 900M | Detecção zero-shot de componentes visuais (bounding boxes) |
+| **Florence-2-large-ft** | Microsoft | 770M | Detecção zero-shot de componentes visuais (bounding boxes) |
 | **Claude Sonnet 4.6** | Anthropic | - | Identificação de provedor, classificação de componentes, análise STRIDE |
 
 ### 6.4 Estimativa de Custo por Imagem Analisada
@@ -328,7 +338,7 @@ MyDrive/
 **Etapas**:
 1. Montar Google Drive e carregar imagem de teste
 2. **Passo 1 - Identificar provedor**: Enviar imagem ao Claude Vision API com prompt para identificar se é AWS ou Azure
-3. **Passo 2a - Detecção visual**: Carregar Florence-2 (`microsoft/Florence-2-large`) e executar detecção zero-shot com prompt específico para componentes de arquitetura cloud
+3. **Passo 2a - Detecção visual**: Carregar Florence-2 (`microsoft/Florence-2-large-ft`) e executar detecção com 5 estratégias (OCR, Phrase Grounding, Region Proposal, Dense Caption, OD) na imagem completa + tiling 3x3 com 20% overlap
 4. **Passo 2b - Classificação**: Recortar cada região detectada (crop dos bounding boxes) e enviar ao Claude Vision para classificação refinada com nome exato do serviço
 5. Salvar resultados em JSON (lista de componentes com bboxes e classes)
 6. Visualizar imagem original com bounding boxes anotados usando `supervision`
@@ -393,7 +403,7 @@ Conforme definido no enunciado:
 ## 11. Referências
 
 - [Metodologia STRIDE - Microsoft](https://learn.microsoft.com/en-us/azure/security/develop/threat-modeling-tool-threats)
-- [Florence-2-large - Microsoft (Hugging Face)](https://huggingface.co/microsoft/Florence-2-large)
+- [Florence-2-large-ft - Microsoft (Hugging Face)](https://huggingface.co/microsoft/Florence-2-large-ft)
 - [Claude API - Models (Anthropic)](https://platform.claude.com/docs/en/build-with-claude/models)
 - [Claude Vision API (Anthropic)](https://platform.claude.com/docs/en/build-with-claude/vision)
 - [AWS Well-Architected Framework - Security Pillar](https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/welcome.html)
