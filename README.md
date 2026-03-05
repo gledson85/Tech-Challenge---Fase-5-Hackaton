@@ -48,7 +48,7 @@ Imagem de Arquitetura (.png)
         |
   [Passo 3] Análise STRIDE por componente (Claude API)
         |
-  [Passo 4] Relatório de Ameaças (JSON + PDF)
+  [Passo 4] Relatório de Ameaças (JSON + HTML)
 ```
 
 ### 3.2 Detalhamento dos Passos
@@ -130,12 +130,12 @@ O sistema consolida toda a análise em dois formatos:
 }
 ```
 
-**PDF formatado**: Para apresentação e documentação, contendo:
+**HTML formatado**: Para apresentação e documentação, contendo:
 - Capa com dados do projeto
-- Imagem original com bounding boxes anotados
 - Tabela de componentes detectados
-- Análise STRIDE detalhada por componente
+- Análise STRIDE detalhada por componente com badges coloridas de risco
 - Resumo executivo com principais riscos e recomendações
+- CSS inline (sem dependências externas), pode ser salvo como PDF pelo navegador (Ctrl+P)
 
 ---
 
@@ -261,7 +261,7 @@ Componentes presentes:
 | `transformers` | latest | Florence-2 (detecção de componentes) |
 | `anthropic` | latest | Claude API (classificação + STRIDE) |
 | `supervision` | latest | Visualização de bounding boxes |
-| `fpdf2` | latest | Geração de relatório PDF |
+| _(removido)_ | - | _(relatório agora em HTML, sem dependência de fpdf2)_ |
 | `timm` | latest | Dependência do Florence-2 (modelos de visão) |
 | `einops` | latest | Dependência do Florence-2 (operações tensoriais) |
 | `torch` | latest | Backend para Florence-2 (pré-instalado no Colab) |
@@ -312,7 +312,7 @@ Tech-Challenge---Fase-5-Hackaton/
 │   └── 03_demo.ipynb                  # Demo end-to-end
 └── outputs/
     ├── detections/                    # Imagens com bboxes anotados
-    └── reports/                       # Relatórios STRIDE (JSON + PDF)
+    └── reports/                       # Relatórios STRIDE (JSON + HTML)
 ```
 
 ### 7.2 Google Drive
@@ -324,7 +324,7 @@ MyDrive/
     ├── test_images/                   # Imagens de teste (arquitetura 1 e 2)
     └── outputs/
         ├── detections/                # Resultados da detecção
-        └── reports/                   # Relatórios gerados (JSON + PDF)
+        └── reports/                   # Relatórios gerados (JSON + HTML)
 ```
 
 ---
@@ -358,11 +358,11 @@ MyDrive/
 3. Enviar ao Claude API para análise STRIDE completa
 4. Para cada ameaça, gerar contramedidas específicas do provedor
 5. Consolidar em JSON estruturado
-6. Gerar relatório PDF formatado com `fpdf2`
+6. Gerar relatório HTML formatado (CSS inline, sem dependências externas)
 
 **Output**:
 - `outputs/reports/stride_arquitetura_X.json`
-- `outputs/reports/stride_arquitetura_X.pdf`
+- `outputs/reports/stride_arquitetura_X.html`
 
 ### 8.3 Notebook 03 - Demo (`03_demo.ipynb`)
 
@@ -374,7 +374,7 @@ MyDrive/
 3. Visualização lado a lado: imagem com bboxes + resumo do relatório
 4. Métricas de execução: tempo de processamento por etapa, número de componentes detectados, número de ameaças identificadas
 
-**Output**: Relatórios completos para ambas as arquiteturas (JSON + PDF)
+**Output**: Relatórios completos para ambas as arquiteturas (JSON + HTML)
 
 ---
 
@@ -409,6 +409,5 @@ Conforme definido no enunciado:
 - [AWS Well-Architected Framework - Security Pillar](https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/welcome.html)
 - [Azure Security Benchmark - Microsoft](https://learn.microsoft.com/en-us/security/benchmark/azure/overview)
 - [Supervision - Roboflow](https://supervision.roboflow.com/)
-- [fpdf2 - Geração de PDF](https://py-pdf.github.io/fpdf2/)
 - [Google Colab](https://colab.google/)
 - [Ultralytics YOLO](https://docs.ultralytics.com/)

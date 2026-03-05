@@ -4,7 +4,7 @@ Você é um assistente especializado em segurança de software e IA. Preciso da 
 
 Desenvolver um MVP que recebe uma imagem PNG de um diagrama de arquitetura de software (AWS ou Azure) e gera automaticamente um Relatório de Modelagem de Ameaças baseado na metodologia STRIDE.
 
-## Pipeline (4 passos)
+## Pipeline (4 passos, 6 sub-etapas)
 
 O sistema deve executar os seguintes passos em sequência:
 
@@ -13,27 +13,40 @@ O sistema deve executar os seguintes passos em sequência:
 - Usar Claude Vision API (multimodal) para análise visual de logotipos, cores e nomenclatura
 - Output: string "AWS" ou "Azure"
 
-**Passo 2 — Detectar componentes:**
-- Usar Florence-2 (microsoft/Florence-2-large, pré-treinado, 900M parâmetros) com múltiplas estratégias de detecção para diagramas técnicos:
+**Passo 2 — Detectar componentes (3 sub-etapas):**
+
+*Passo 2a — Detecção visual com Florence-2:*
+- Usar Florence-2 (microsoft/Florence-2-large-ft, fine-tuned, 770M parâmetros) com múltiplas estratégias de detecção para diagramas técnicos:
   - OCR_WITH_REGION: detecta textos (nomes dos serviços) com bounding boxes
-  - CAPTION_TO_PHRASE_GROUNDING: localiza termos específicos de componentes cloud
+  - CAPTION_TO_PHRASE_GROUNDING: localiza termos específicos de componentes cloud (1 por query)
   - REGION_PROPOSAL: propostas genéricas de regiões
   - DENSE_REGION_CAPTION: regiões com legenda densa
   - OD: detecção de objetos (complementar)
-- Filtros relaxados para diagramas (min_area_ratio=0.0005, max_area_ratio=0.8, min_size=5px)
-- NMS (IoU > 0.5) para remover duplicatas
+- Tiling 3x3 com 20% overlap para capturar componentes menores
+- Filtros para diagramas (min_area_ratio=0.0005, max_area_ratio=0.05, min_size=5px)
+- NMS (IoU > 0.5) para remover duplicatas geométricas
+
+*Passo 2b — Classificação com Claude Vision:*
 - Recortar cada região detectada (crop) e enviar ao Claude Vision API para classificação refinada com nome exato do serviço cloud
+- Deduplicação espacial pós-classificação: agrupa por nome, clusteriza por proximidade (centros < 100px), mantém menor bbox por cluster
 - Output: lista JSON de componentes com nome, classe genérica, bounding box e provedor
 
-**Passo 3 — Análise STRIDE:**
+*Passo 2c — Análise de topologia com Claude Vision:*
+- Enviar imagem completa + lista de componentes ao Claude Vision
+- Identificar: grupos/containers (VPC, Subnets, AZs), conexões entre componentes, fluxo de dados end-to-end
+- Output: JSON com groups, connections e data_flow
+
+**Passo 3 — Análise STRIDE (com contexto topológico):**
 - Para cada componente detectado, usar Claude API para gerar análise STRIDE completa
 - Cada componente recebe análise nas 6 categorias: Spoofing, Tampering, Repudiation, Information Disclosure, Denial of Service, Elevation of Privilege
 - Incluir nível de risco (Alto/Médio/Baixo) e contramedidas específicas do provedor
+- Contexto topológico: em qual grupo está, com quem se conecta, posição no fluxo de dados
 - Referenciar boas práticas (AWS Well-Architected / Azure Security Benchmark)
+- Parser JSON robusto com 3 estratégias de fallback (clean+parse, raw extract, regex per-category)
 
 **Passo 4 — Gerar relatório:**
-- JSON estruturado (para integração)
-- PDF formatado (para apresentação): capa, tabela de componentes, análise STRIDE detalhada, resumo executivo
+- JSON estruturado (para integração) — inclui topologia e análise STRIDE
+- HTML formatado (para apresentação): capa, resumo executivo, tabela de componentes, análise STRIDE detalhada por componente com badge de risco colorida. Pode ser salvo como PDF pelo navegador (Ctrl+P).
 
 ## Classes de Detecção
 
@@ -84,7 +97,7 @@ O sistema será testado com 2 imagens (disponíveis no repositório como "arquit
 - Ambiente: Google Colab Pro (GPU T4/A100)
 - Linguagem: Python 3.11
 - Storage: Google Drive
-- Bibliotecas: transformers, anthropic, supervision, fpdf2, torch, Pillow, matplotlib, timm, einops
+- Bibliotecas: transformers, anthropic, supervision, torch, Pillow, matplotlib, timm, einops
 - Nota: flash_attn (Flash Attention) não é utilizada — a compilação falha no Colab por incompatibilidade com CUDA. Florence-2 funciona normalmente sem ela, usando atenção padrão do PyTorch.
 - Modelos: Florence-2-large-ft (Microsoft, fine-tuned) + Claude Sonnet 4.6 (Anthropic)
 
@@ -107,15 +120,15 @@ Output: outputs/detections/componentes_arquitetura_X.json
 3. Claude API gera análise STRIDE completa
 4. Gerar contramedidas específicas
 5. Consolidar JSON
-6. Gerar PDF com fpdf2
-Output: outputs/reports/stride_arquitetura_X.json e .pdf
+6. Gerar HTML (CSS inline, sem dependências externas)
+Output: outputs/reports/stride_arquitetura_X.json e .html
 
 **03_demo.ipynb** (GPU T4):
 1. Pipeline end-to-end completo
 2. Executar para as 2 arquiteturas de teste
 3. Visualização: imagem com bboxes + resumo do relatório
 4. Métricas: tempo, componentes detectados, ameaças identificadas
-Output: Relatórios completos (JSON + PDF)
+Output: Relatórios completos (JSON + HTML)
 
 ## Estrutura de Pastas
 
