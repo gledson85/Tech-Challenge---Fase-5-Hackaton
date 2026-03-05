@@ -4,7 +4,7 @@ Você é um assistente especializado em segurança de software e IA. Preciso da 
 
 Desenvolver um MVP que recebe uma imagem PNG de um diagrama de arquitetura de software (AWS ou Azure) e gera automaticamente um Relatório de Modelagem de Ameaças baseado na metodologia STRIDE.
 
-## Pipeline (4 passos, 6 sub-etapas)
+## Pipeline (4 passos, 7 sub-etapas)
 
 O sistema deve executar os seguintes passos em sequência:
 
@@ -46,7 +46,15 @@ O sistema deve executar os seguintes passos em sequência:
 
 **Passo 4 — Gerar relatório:**
 - JSON estruturado (para integração) — inclui topologia e análise STRIDE
-- HTML formatado (para apresentação): capa, resumo executivo, tabela de componentes, análise STRIDE detalhada por componente com badge de risco colorida. Pode ser salvo como PDF pelo navegador (Ctrl+P).
+- HTML formatado (para apresentação) com CSS inline, sem dependências externas:
+  - Capa com gradiente Material Blue e título branco
+  - Resumo executivo com badges de risco coloridas (Alto=vermelho, Médio=amarelo, Baixo=verde)
+  - Imagens da arquitetura embutidas em base64 (original + anotada com bboxes numerados)
+  - Seção de topologia: fluxo de dados visual, grupos/containers, tabela de conexões
+  - Tabela de componentes com numeração (#N), classe, localização topológica e provedor
+  - Nota explicativa quando há componentes com mesmo nome em diferentes zonas
+  - Análise STRIDE detalhada por componente com badge de localização, chips de conexões e categorias com nível de risco
+  - Pode ser salvo como PDF pelo navegador (Ctrl+P)
 
 ## Classes de Detecção
 
@@ -101,6 +109,14 @@ O sistema será testado com 2 imagens (disponíveis no repositório como "arquit
 - Nota: flash_attn (Flash Attention) não é utilizada — a compilação falha no Colab por incompatibilidade com CUDA. Florence-2 funciona normalmente sem ela, usando atenção padrão do PyTorch.
 - Modelos: Florence-2-large-ft (Microsoft, fine-tuned) + Claude Sonnet 4.6 (Anthropic)
 
+## Configuração Necessária no Google Colab
+
+Antes de executar qualquer notebook:
+1. No menu lateral do Colab, em 🔑 Secrets, adicionar: ANTHROPIC_API_KEY (chave da API Anthropic)
+2. No menu Ambiente de execução > Alterar tipo:
+   - nb01 e nb03: GPU T4 (gratuita) ou A100 (Pro) — necessário para Florence-2
+   - nb02: CPU é suficiente (apenas chamadas API)
+
 ## Estrutura de Notebooks
 
 O projeto usa 3 notebooks no Google Colab:
@@ -110,34 +126,36 @@ O projeto usa 3 notebooks no Google Colab:
 2. Passo 1: Claude Vision identifica provedor (AWS/Azure)
 3. Passo 2a: Florence-2-large-ft detecta componentes (5 estratégias: OCR, Phrase Grounding, Region Proposal, Dense Caption, OD) + tiling 3x3 com 20% overlap
 4. Passo 2b: Claude Vision classifica cada crop com nome exato do serviço
-5. Salvar JSON com componentes detectados
-6. Visualizar bboxes com supervision
-Output: outputs/detections/componentes_arquitetura_X.json
+5. Passo 2c: Claude Vision analisa topologia (grupos, conexões, fluxo de dados)
+6. Salvar JSON com componentes detectados e topologia
+7. Visualizar bboxes numerados (#N) com supervision
+Output: outputs/detections/componentes_arquitetura_X.json + annotated_arquitetura_X.png
 
-**02_stride_analysis.ipynb** (sem GPU):
-1. Carregar JSON de componentes
-2. Montar prompt STRIDE contextualizado por componente
+**02_stride_analysis.ipynb** (sem GPU, CPU suficiente):
+1. Carregar JSON de componentes (inclui topologia)
+2. Montar prompt STRIDE contextualizado por componente (com posição topológica, conexões, fluxo)
 3. Claude API gera análise STRIDE completa
 4. Gerar contramedidas específicas
 5. Consolidar JSON
-6. Gerar HTML (CSS inline, sem dependências externas)
+6. Gerar HTML com imagens base64, topologia, localização e conexões por componente
 Output: outputs/reports/stride_arquitetura_X.json e .html
 
-**03_consolidado.ipynb** (GPU T4):
-1. Pipeline end-to-end completo
+**03_consolidado.ipynb** (GPU T4/A100):
+1. Pipeline end-to-end completo (todos os passos 1-4)
 2. Executar para as 2 arquiteturas de teste
-3. Visualização: imagem com bboxes + resumo do relatório
+3. Visualização: imagem com bboxes numerados (#N) + resumo do relatório
 4. Métricas: tempo, componentes detectados, ameaças identificadas
-Output: Relatórios completos (JSON + HTML)
+Output: Relatórios completos (JSON + HTML) + imagens anotadas
 
 ## Estrutura de Pastas
 
 ```
 Tech-Challenge---Fase-5-Hackaton/
 ├── README.md
-├── IADT - Fase 5 - Hackaton.pdf    # Enunciado
-├── arquitetura 1.png               # Teste AWS
-├── arquitetura 2.png               # Teste Azure
+├── prompt.txt                     # Contexto completo do projeto
+├── IADT - Fase 5 - Hackaton.pdf   # Enunciado
+├── arquitetura 1.png              # Teste AWS
+├── arquitetura 2.png              # Teste Azure
 ├── notebooks/
 │   ├── 01_component_detection.ipynb
 │   ├── 02_stride_analysis.ipynb
@@ -147,14 +165,13 @@ Tech-Challenge---Fase-5-Hackaton/
     └── reports/
 ```
 
-Google Drive:
+Google Drive (criado automaticamente pelos notebooks):
 ```
 MyDrive/hackaton-stride/
-├── notebooks/
-├── test_images/
+├── test_images/                   # Imagens de teste
 └── outputs/
-    ├── detections/
-    └── reports/
+    ├── detections/                # JSONs + imagens anotadas
+    └── reports/                   # Relatórios JSON + HTML
 ```
 
 ## Backlog Opcional (se sobrar tempo)

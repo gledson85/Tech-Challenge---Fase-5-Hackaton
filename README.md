@@ -15,6 +15,7 @@ A FIAP Software Security está analisando a viabilidade de uma nova funcionalida
 O objetivo é desenvolver um MVP para detecção de ameaças que:
 - Interprete automaticamente um diagrama de arquitetura de sistema
 - Identifique os componentes (usuários, servidores, bases de dados, APIs, etc.)
+- Analise a topologia (grupos, conexões, fluxo de dados)
 - Gere um Relatório de Modelagem de Ameaças baseado na metodologia STRIDE
 - Busque vulnerabilidades relacionadas a cada componente e contramedidas específicas
 
@@ -44,7 +45,11 @@ Imagem de Arquitetura (.png)
         |
   [Passo 1] Identificar provedor cloud (AWS / Azure)
         |
-  [Passo 2] Detectar componentes (Florence-2 + Claude Vision)
+  [Passo 2a] Detectar componentes visuais (Florence-2)
+        |
+  [Passo 2b] Classificar componentes (Claude Vision)
+        |
+  [Passo 2c] Analisar topologia (Claude Vision)
         |
   [Passo 3] Análise STRIDE por componente (Claude API)
         |
@@ -64,9 +69,7 @@ O sistema recebe uma imagem de diagrama de arquitetura e identifica automaticame
 **Input**: Imagem PNG do diagrama
 **Output**: String identificando o provedor (`"AWS"` ou `"Azure"`)
 
-#### Passo 2 - Detecção de Componentes
-
-Dois modelos trabalham em conjunto:
+#### Passo 2a - Detecção Visual de Componentes
 
 **Florence-2-large-ft** (Microsoft, pré-treinado fine-tuned):
 - Modelo de visão computacional com 770M de parâmetros (versão fine-tuned para melhor detecção)
@@ -77,31 +80,50 @@ Dois modelos trabalham em conjunto:
   - `DENSE_REGION_CAPTION`: regiões com legenda densa
   - `OD`: detecção de objetos (complementar)
 - Tiling 3x3 com 20% de overlap: repete todas as estratégias em cada tile para capturar componentes menores
-- Filtros relaxados para diagramas técnicos (min_area_ratio=0.0005, max_area_ratio=0.8, min_size=5px)
+- Filtros para diagramas técnicos (min_area_ratio=0.0005, max_area_ratio=0.05, min_size=5px)
 - NMS (Non-Maximum Suppression) com IoU > 0.5 para remover duplicatas
+
+**Input**: Imagem PNG do diagrama
+**Output**: Lista de bounding boxes com labels brutos
+
+#### Passo 2b - Classificação de Componentes
 
 **Claude Vision API** (classificação refinada):
 - Recebe os recortes (crops) de cada bounding box detectado pelo Florence-2
 - Classifica cada componente com nome específico do serviço cloud
-- Contextualiza o componente dentro da arquitetura (função, conexões)
+- Deduplicação espacial pós-classificação: agrupa por nome, clusteriza por proximidade (centros < 100px), mantém menor bbox por cluster
 
-**Input**: Imagem PNG do diagrama
+**Input**: Crops dos bounding boxes + imagem completa para contexto
 **Output**: Lista de componentes detectados com:
 - Nome do serviço (ex: "Amazon RDS", "API Gateway")
 - Classe genérica (ex: "database", "api_gateway")
 - Bounding box (coordenadas x, y, largura, altura)
 - Provedor cloud (AWS / Azure)
 
+#### Passo 2c - Análise de Topologia
+
+**Claude Vision API** (análise topológica):
+- Recebe a imagem completa + lista de componentes detectados
+- Identifica a estrutura organizacional do diagrama:
+  - **Grupos/containers**: VPC, Subnets, Availability Zones, Resource Groups
+  - **Conexões**: setas e linhas entre componentes (comunicação, dependência)
+  - **Fluxo de dados**: ordem do tráfego de ponta a ponta (do usuário ao backend)
+
+**Input**: Imagem PNG + lista de componentes
+**Output**: JSON com `groups`, `connections` e `data_flow`
+
 #### Passo 3 - Análise STRIDE
 
-Para cada componente detectado, o Claude API gera uma análise STRIDE completa:
+Para cada componente detectado, o Claude API gera uma análise STRIDE completa com contexto topológico:
 
-**Input**: Lista de componentes + provedor cloud + contexto da arquitetura
+**Input**: Componente + lista completa de componentes + provedor + topologia (grupo, conexões, posição no fluxo)
 **Output**: Para cada componente:
 - Ameaças identificadas por categoria STRIDE (S/T/R/I/D/E)
 - Nível de risco (Alto / Médio / Baixo)
 - Contramedidas recomendadas para cada ameaça
 - Referências a boas práticas do provedor (AWS Well-Architected / Azure Security Benchmark)
+
+**Parser robusto**: 3 estratégias de fallback (clean+parse, raw extract, regex per-category) para garantir extração do JSON mesmo com variações na resposta do modelo.
 
 #### Passo 4 - Geração do Relatório
 
@@ -110,8 +132,8 @@ O sistema consolida toda a análise em dois formatos:
 **JSON estruturado**: Para integração com outros sistemas
 ```json
 {
-  "provider": "AWS",
-  "image": "arquitetura_1.png",
+  "metadata": { "project": "...", "methodology": "STRIDE", "provider": "AWS" },
+  "topology": { "groups": [...], "connections": [...], "data_flow": [...] },
   "components": [
     {
       "name": "Amazon RDS (Primary)",
@@ -119,22 +141,26 @@ O sistema consolida toda a análise em dois formatos:
       "bbox": [184, 462, 112, 75],
       "threats": {
         "spoofing": {
-          "description": "Acesso não autenticado ao banco de dados",
+          "threat": "Acesso não autenticado ao banco de dados",
           "risk": "Alto",
-          "countermeasure": "Habilitar IAM Database Authentication + Security Groups restritivos"
+          "countermeasure": "Habilitar IAM Database Authentication",
+          "reference": "AWS Well-Architected - SEC05"
         }
       }
     }
   ],
-  "summary": {}
+  "summary": { "total_components": 15, "total_threats": 90, "risk_distribution": {...} }
 }
 ```
 
 **HTML formatado**: Para apresentação e documentação, contendo:
-- Capa com dados do projeto
-- Tabela de componentes detectados
-- Análise STRIDE detalhada por componente com badges coloridas de risco
-- Resumo executivo com principais riscos e recomendações
+- Capa com gradiente Material Blue e título branco
+- Resumo executivo com badges coloridas de risco (Alto=vermelho, Médio=amarelo, Baixo=verde)
+- Imagens da arquitetura embutidas em base64 (original + anotada com bboxes numerados)
+- Seção de topologia: fluxo de dados visual com chips, grupos/containers hierárquicos, tabela de conexões
+- Tabela de componentes com numeração (#N), classe, localização topológica e provedor
+- Nota explicativa quando há componentes com mesmo nome em diferentes zonas de disponibilidade
+- Análise STRIDE detalhada por componente: badge de localização, chips de conexões, 6 categorias com nível de risco
 - CSS inline (sem dependências externas), pode ser salvo como PDF pelo navegador (Ctrl+P)
 
 ---
@@ -256,17 +282,16 @@ Componentes presentes:
 
 ### 6.2 Bibliotecas Principais
 
-| Biblioteca | Versão | Uso |
-|-----------|--------|-----|
-| `transformers` | latest | Florence-2 (detecção de componentes) |
-| `anthropic` | latest | Claude API (classificação + STRIDE) |
-| `supervision` | latest | Visualização de bounding boxes |
-| _(removido)_ | - | _(relatório agora em HTML, sem dependência de fpdf2)_ |
-| `timm` | latest | Dependência do Florence-2 (modelos de visão) |
-| `einops` | latest | Dependência do Florence-2 (operações tensoriais) |
-| `torch` | latest | Backend para Florence-2 (pré-instalado no Colab) |
-| `Pillow` | latest | Manipulação de imagens (pré-instalado no Colab) |
-| `matplotlib` | latest | Visualizações (pré-instalado no Colab) |
+| Biblioteca | Uso |
+|-----------|-----|
+| `transformers` | Florence-2 (detecção de componentes) |
+| `anthropic` | Claude API (classificação, topologia, STRIDE) |
+| `supervision` | Visualização de bounding boxes numerados |
+| `timm` | Dependência do Florence-2 (modelos de visão) |
+| `einops` | Dependência do Florence-2 (operações tensoriais) |
+| `torch` | Backend para Florence-2 (pré-instalado no Colab) |
+| `Pillow` | Manipulação de imagens (pré-instalado no Colab) |
+| `matplotlib` | Visualizações (pré-instalado no Colab) |
 
 > **Nota sobre `flash_attn`**: A biblioteca Flash Attention (`flash_attn`) seria utilizada para acelerar o mecanismo de atenção do Florence-2, reduzindo o consumo de memória GPU e aumentando a velocidade de inferência. Porém, a compilação falha no ambiente Google Colab devido a incompatibilidades com a versão do CUDA/compilador disponível. O Florence-2 funciona normalmente sem ela, utilizando a implementação padrão de atenção do PyTorch.
 
@@ -275,7 +300,7 @@ Componentes presentes:
 | Modelo | Provedor | Parâmetros | Uso no Projeto |
 |--------|----------|-----------|----------------|
 | **Florence-2-large-ft** | Microsoft | 770M | Detecção zero-shot de componentes visuais (bounding boxes) |
-| **Claude Sonnet 4.6** | Anthropic | - | Identificação de provedor, classificação de componentes, análise STRIDE |
+| **Claude Sonnet 4.6** | Anthropic | - | Identificação de provedor, classificação de componentes, análise de topologia, análise STRIDE |
 
 ### 6.4 Estimativa de Custo por Imagem Analisada
 
@@ -284,11 +309,12 @@ Preços base do Claude Sonnet 4.6: **$3.00 / 1M tokens de input** e **$15.00 / 1
 | Etapa | Chamadas API | Tokens Input | Tokens Output | Custo Input | Custo Output | Subtotal (USD) | Subtotal (BRL) |
 |-------|-------------|-------------|--------------|-------------|-------------|---------------|---------------|
 | Passo 1 — Identificar provedor | 1 | ~1.800 | ~50 | $0,005 | $0,001 | **$0,006** | **R$ 0,03** |
-| Passo 2 — Classificação de componentes | ~15 | ~15.000 | ~2.500 | $0,045 | $0,038 | **$0,083** | **R$ 0,46** |
-| Passo 3 — Análise STRIDE | 1 | ~3.000 | ~5.000 | $0,009 | $0,075 | **$0,084** | **R$ 0,46** |
-| **Total por imagem** | **~17** | **~19.800** | **~7.550** | **$0,059** | **$0,114** | **~$0,17** | **~R$ 0,94** |
+| Passo 2b — Classificação | ~15 | ~15.000 | ~2.500 | $0,045 | $0,038 | **$0,083** | **R$ 0,46** |
+| Passo 2c — Topologia | 1 | ~2.500 | ~2.000 | $0,008 | $0,030 | **$0,038** | **R$ 0,21** |
+| Passo 3 — Análise STRIDE | ~15 | ~52.500 | ~7.500 | $0,158 | $0,113 | **$0,271** | **R$ 1,49** |
+| **Total por imagem** | **~32** | **~71.800** | **~12.050** | **$0,216** | **$0,182** | **~$0,40** | **~R$ 2,19** |
 
-> **Custo estimado por imagem analisada: ~US$ 0,17 (~R$ 0,94)**
+> **Custo estimado por imagem analisada: ~US$ 0,40 (~R$ 2,19)**
 > Cotação utilizada: US$ 1,00 = R$ 5,50
 >
 > Florence-2 roda localmente na GPU do Colab (sem custo adicional de API).
@@ -303,15 +329,16 @@ Preços base do Claude Sonnet 4.6: **$3.00 / 1M tokens de input** e **$15.00 / 1
 ```
 Tech-Challenge---Fase-5-Hackaton/
 ├── README.md                          # Este arquivo
+├── prompt.txt                         # Contexto completo para recriar o projeto
 ├── IADT - Fase 5 - Hackaton.pdf       # Enunciado do projeto
 ├── arquitetura 1.png                  # Diagrama AWS (teste)
 ├── arquitetura 2.png                  # Diagrama Azure (teste)
 ├── notebooks/
-│   ├── 01_component_detection.ipynb   # Detecção de componentes
-│   ├── 02_stride_analysis.ipynb       # Análise STRIDE
-│   └── 03_consolidado.ipynb            # Pipeline consolidado end-to-end
+│   ├── 01_component_detection.ipynb   # Detecção de componentes + topologia
+│   ├── 02_stride_analysis.ipynb       # Análise STRIDE + relatório
+│   └── 03_consolidado.ipynb           # Pipeline consolidado end-to-end
 └── outputs/
-    ├── detections/                    # Imagens com bboxes anotados
+    ├── detections/                    # JSONs + imagens anotadas com bboxes
     └── reports/                       # Relatórios STRIDE (JSON + HTML)
 ```
 
@@ -320,16 +347,28 @@ Tech-Challenge---Fase-5-Hackaton/
 ```
 MyDrive/
 └── hackaton-stride/
-    ├── notebooks/                     # Notebooks do Colab
     ├── test_images/                   # Imagens de teste (arquitetura 1 e 2)
     └── outputs/
-        ├── detections/                # Resultados da detecção
+        ├── detections/                # Resultados da detecção + imagens anotadas
         └── reports/                   # Relatórios gerados (JSON + HTML)
 ```
+
+> Os notebooks criam automaticamente todas as pastas necessárias no Google Drive na primeira execução.
 
 ---
 
 ## 8. Notebooks
+
+### Configuração Necessária (todos os notebooks)
+
+Antes de executar qualquer notebook no Google Colab:
+
+1. **Secrets**: No menu lateral do Colab, clique em 🔑 **Secrets** e adicione:
+   - `ANTHROPIC_API_KEY`: Chave de API da Anthropic (obtenha em https://console.anthropic.com)
+
+2. **Ambiente de execução**: No menu **Ambiente de execução > Alterar tipo de ambiente de execução**:
+   - **Notebooks 01 e 03**: Selecione **GPU T4** (gratuita) ou **A100** (Colab Pro) — necessário para Florence-2
+   - **Notebook 02**: **CPU** é suficiente (apenas chamadas API). Funciona também com GPU, mas não é necessário.
 
 ### 8.1 Notebook 01 - Detecção de Componentes (`01_component_detection.ipynb`)
 
@@ -339,26 +378,33 @@ MyDrive/
 1. Montar Google Drive e carregar imagem de teste
 2. **Passo 1 - Identificar provedor**: Enviar imagem ao Claude Vision API com prompt para identificar se é AWS ou Azure
 3. **Passo 2a - Detecção visual**: Carregar Florence-2 (`microsoft/Florence-2-large-ft`) e executar detecção com 5 estratégias (OCR, Phrase Grounding, Region Proposal, Dense Caption, OD) na imagem completa + tiling 3x3 com 20% overlap
-4. **Passo 2b - Classificação**: Recortar cada região detectada (crop dos bounding boxes) e enviar ao Claude Vision para classificação refinada com nome exato do serviço
-5. Salvar resultados em JSON (lista de componentes com bboxes e classes)
-6. Visualizar imagem original com bounding boxes anotados usando `supervision`
+4. **Passo 2b - Classificação**: Recortar cada região detectada (crop dos bounding boxes) e enviar ao Claude Vision para classificação refinada com nome exato do serviço. Deduplicação espacial por proximidade (centros < 100px).
+5. **Passo 2c - Topologia**: Enviar imagem completa + lista de componentes ao Claude Vision para identificar grupos (VPC, Subnets, AZs), conexões entre componentes e fluxo de dados end-to-end
+6. Salvar resultados em JSON (componentes com bboxes, classes e topologia)
+7. Visualizar imagem com bounding boxes numerados (#N) usando `supervision`
 
-**Output**: `outputs/detections/componentes_arquitetura_X.json`
+**Output**:
+- `outputs/detections/componentes_arquitetura_X.json`
+- `outputs/detections/annotated_arquitetura_X.png`
 
 ### 8.2 Notebook 02 - Análise STRIDE (`02_stride_analysis.ipynb`)
 
-**GPU necessária**: Nenhuma (apenas chamadas API)
+**GPU necessária**: Nenhuma (CPU suficiente)
 
 **Etapas**:
-1. Carregar JSON de componentes detectados
+1. Carregar JSON de componentes detectados (inclui topologia)
 2. Para cada componente, montar prompt STRIDE contextualizado:
-   - Nome e classe do componente
-   - Provedor cloud (AWS/Azure)
-   - Posição na arquitetura (se está em subnet pública/privada, etc.)
-3. Enviar ao Claude API para análise STRIDE completa
+   - Nome, classe e provedor do componente
+   - Posição topológica: grupo/container, conexões, posição no fluxo de dados
+   - Contexto completo da arquitetura (outros componentes presentes)
+3. Enviar ao Claude API para análise STRIDE completa (parser robusto com 3 fallbacks)
 4. Para cada ameaça, gerar contramedidas específicas do provedor
 5. Consolidar em JSON estruturado
-6. Gerar relatório HTML formatado (CSS inline, sem dependências externas)
+6. Gerar relatório HTML com:
+   - Imagens embutidas em base64 (original + anotada)
+   - Seção de topologia (fluxo visual, grupos, conexões)
+   - Tabela de componentes com localização topológica
+   - Análise STRIDE detalhada com badges de risco e conexões
 
 **Output**:
 - `outputs/reports/stride_arquitetura_X.json`
@@ -366,15 +412,16 @@ MyDrive/
 
 ### 8.3 Notebook 03 - Pipeline Consolidado (`03_consolidado.ipynb`)
 
-**GPU necessária**: T4
+**GPU necessária**: T4 ou A100
 
 **Etapas**:
-1. Pipeline end-to-end: recebe imagem → identifica provedor → detecta componentes → analisa STRIDE → gera relatório
+1. Pipeline end-to-end: recebe imagem → identifica provedor → detecta componentes → analisa topologia → analisa STRIDE → gera relatório
 2. Executar para as duas arquiteturas de teste (AWS e Azure)
-3. Visualização lado a lado: imagem com bboxes + resumo do relatório
+3. Visualização com bounding boxes numerados (#N) + resumo do relatório
 4. Métricas de execução: tempo de processamento por etapa, número de componentes detectados, número de ameaças identificadas
+5. Estimativa de custo por imagem
 
-**Output**: Relatórios completos para ambas as arquiteturas (JSON + HTML)
+**Output**: Relatórios completos para ambas as arquiteturas (JSON + HTML + imagens anotadas)
 
 ---
 
