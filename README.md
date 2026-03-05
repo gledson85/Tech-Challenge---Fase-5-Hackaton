@@ -309,7 +309,7 @@ Tech-Challenge---Fase-5-Hackaton/
 ├── notebooks/
 │   ├── 01_component_detection.ipynb   # Detecção de componentes
 │   ├── 02_stride_analysis.ipynb       # Análise STRIDE
-│   └── 03_demo.ipynb                  # Demo end-to-end
+│   └── 03_consolidado.ipynb            # Pipeline consolidado end-to-end
 └── outputs/
     ├── detections/                    # Imagens com bboxes anotados
     └── reports/                       # Relatórios STRIDE (JSON + HTML)
@@ -364,7 +364,7 @@ MyDrive/
 - `outputs/reports/stride_arquitetura_X.json`
 - `outputs/reports/stride_arquitetura_X.html`
 
-### 8.3 Notebook 03 - Demo (`03_demo.ipynb`)
+### 8.3 Notebook 03 - Pipeline Consolidado (`03_consolidado.ipynb`)
 
 **GPU necessária**: T4
 

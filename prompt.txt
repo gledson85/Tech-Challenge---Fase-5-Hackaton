@@ -123,7 +123,7 @@ Output: outputs/detections/componentes_arquitetura_X.json
 6. Gerar HTML (CSS inline, sem dependências externas)
 Output: outputs/reports/stride_arquitetura_X.json e .html
 
-**03_demo.ipynb** (GPU T4):
+**03_consolidado.ipynb** (GPU T4):
 1. Pipeline end-to-end completo
 2. Executar para as 2 arquiteturas de teste
 3. Visualização: imagem com bboxes + resumo do relatório
@@ -141,7 +141,7 @@ Tech-Challenge---Fase-5-Hackaton/
 ├── notebooks/
 │   ├── 01_component_detection.ipynb
 │   ├── 02_stride_analysis.ipynb
-│   └── 03_demo.ipynb
+│   └── 03_consolidado.ipynb
 └── outputs/
     ├── detections/
     └── reports/
