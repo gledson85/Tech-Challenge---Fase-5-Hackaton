@@ -14,7 +14,14 @@ O sistema deve executar os seguintes passos em sequência:
 - Output: string "AWS" ou "Azure"
 
 **Passo 2 — Detectar componentes:**
-- Usar Florence-2 (microsoft/Florence-2-large, pré-treinado, 900M parâmetros) para detecção zero-shot de componentes visuais, gerando bounding boxes
+- Usar Florence-2 (microsoft/Florence-2-large, pré-treinado, 900M parâmetros) com múltiplas estratégias de detecção para diagramas técnicos:
+  - OCR_WITH_REGION: detecta textos (nomes dos serviços) com bounding boxes
+  - CAPTION_TO_PHRASE_GROUNDING: localiza termos específicos de componentes cloud
+  - REGION_PROPOSAL: propostas genéricas de regiões
+  - DENSE_REGION_CAPTION: regiões com legenda densa
+  - OD: detecção de objetos (complementar)
+- Filtros relaxados para diagramas (min_area_ratio=0.0005, max_area_ratio=0.8, min_size=5px)
+- NMS (IoU > 0.5) para remover duplicatas
 - Recortar cada região detectada (crop) e enviar ao Claude Vision API para classificação refinada com nome exato do serviço cloud
 - Output: lista JSON de componentes com nome, classe genérica, bounding box e provedor
 
@@ -75,9 +82,9 @@ O sistema será testado com 2 imagens (disponíveis no repositório como "arquit
 ## Stack Tecnológica
 
 - Ambiente: Google Colab Pro (GPU T4/A100)
-- Linguagem: Python 3.10+
+- Linguagem: Python 3.11
 - Storage: Google Drive
-- Bibliotecas: transformers, anthropic, supervision, fpdf2, torch, Pillow, matplotlib
+- Bibliotecas: transformers, anthropic, supervision, fpdf2, torch, Pillow, matplotlib, timm, einops, flash_attn
 - Modelos: Florence-2-large (Microsoft) + Claude Sonnet 4.6 (Anthropic)
 
 ## Estrutura de Notebooks
@@ -87,7 +94,7 @@ O projeto usa 3 notebooks no Google Colab:
 **01_component_detection.ipynb** (GPU T4/A100):
 1. Montar Google Drive e carregar imagem
 2. Passo 1: Claude Vision identifica provedor (AWS/Azure)
-3. Passo 2a: Florence-2 detecta componentes (bounding boxes)
+3. Passo 2a: Florence-2 detecta componentes (5 estratégias: OCR, Phrase Grounding, Region Proposal, Dense Caption, OD)
 4. Passo 2b: Claude Vision classifica cada crop com nome exato do serviço
 5. Salvar JSON com componentes detectados
 6. Visualizar bboxes com supervision
