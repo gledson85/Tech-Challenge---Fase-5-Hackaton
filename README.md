@@ -227,7 +227,7 @@ O sistema será avaliado com duas arquiteturas de referência fornecidas no enun
 
 ### 5.1 Arquitetura 1 - AWS
 
-**Arquivo**: `arquitetura 1.png`
+**Arquivo**: `imagens/arquitetura 1.png`
 
 Componentes presentes:
 - **Camada externa**: Usuários SEI, AWS Shield, Amazon CloudFront, AWS WAF
@@ -250,7 +250,7 @@ Componentes presentes:
 
 ### 5.2 Arquitetura 2 - Azure
 
-**Arquivo**: `arquitetura 2.png`
+**Arquivo**: `imagens/arquitetura 2.png`
 
 Componentes presentes:
 - **Atores externos**:
@@ -331,8 +331,9 @@ Tech-Challenge---Fase-5-Hackaton/
 ├── README.md                          # Este arquivo
 ├── prompt.txt                         # Contexto completo para recriar o projeto
 ├── IADT - Fase 5 - Hackaton.pdf       # Enunciado do projeto
-├── arquitetura 1.png                  # Diagrama AWS (teste)
-├── arquitetura 2.png                  # Diagrama Azure (teste)
+├── imagens/
+│   ├── arquitetura 1.png              # Diagrama AWS (teste)
+│   └── arquitetura 2.png              # Diagrama Azure (teste)
 ├── notebooks/
 │   ├── 01_component_detection.ipynb   # Detecção de componentes + topologia
 │   ├── 02_stride_analysis.ipynb       # Análise STRIDE + relatório

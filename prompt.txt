@@ -82,7 +82,7 @@ O sistema deve reconhecer estas categorias de componentes:
 
 ## Arquiteturas de Teste
 
-O sistema será testado com 2 imagens (disponíveis no repositório como "arquitetura 1.png" e "arquitetura 2.png"):
+O sistema será testado com 2 imagens (disponíveis no repositório em "imagens/arquitetura 1.png" e "imagens/arquitetura 2.png"):
 
 **Arquitetura 1 — AWS:**
 - Camada externa: Usuários SEI → AWS Shield → Amazon CloudFront → AWS WAF
@@ -154,8 +154,9 @@ Tech-Challenge---Fase-5-Hackaton/
 ├── README.md
 ├── prompt.txt                     # Contexto completo do projeto
 ├── IADT - Fase 5 - Hackaton.pdf   # Enunciado
-├── arquitetura 1.png              # Teste AWS
-├── arquitetura 2.png              # Teste Azure
+├── imagens/
+│   ├── arquitetura 1.png          # Teste AWS
+│   └── arquitetura 2.png          # Teste Azure
 ├── notebooks/
 │   ├── 01_component_detection.ipynb
 │   ├── 02_stride_analysis.ipynb
