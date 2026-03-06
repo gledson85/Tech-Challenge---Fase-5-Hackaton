@@ -23,7 +23,7 @@ O sistema deve executar os seguintes passos em sequência:
   - DENSE_REGION_CAPTION: regiões com legenda densa
   - OD: detecção de objetos (complementar)
 - Tiling 3x3 com 20% overlap para capturar componentes menores
-- Filtros para diagramas (min_area_ratio=0.0005, max_area_ratio=0.05, min_size=5px)
+- Filtros para diagramas (min_area_ratio=0.0005, max_area_ratio=0.03, min_size=5px)
 - NMS (IoU > 0.5) para remover duplicatas geométricas
 
 *Passo 2b — Classificação com Claude Vision:*
