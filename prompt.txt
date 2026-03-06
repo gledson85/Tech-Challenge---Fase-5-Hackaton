@@ -2,16 +2,16 @@ Você é um assistente especializado em segurança de software e IA. Preciso da 
 
 ## Objetivo do Projeto
 
-Desenvolver um MVP que recebe uma imagem PNG de um diagrama de arquitetura de software (AWS ou Azure) e gera automaticamente um Relatório de Modelagem de Ameaças baseado na metodologia STRIDE.
+Desenvolver um MVP que recebe uma imagem PNG de um diagrama de arquitetura de software (AWS, Azure ou GCP) e gera automaticamente um Relatório de Modelagem de Ameaças baseado na metodologia STRIDE.
 
 ## Pipeline (4 passos, 7 sub-etapas)
 
 O sistema deve executar os seguintes passos em sequência:
 
 **Passo 1 — Identificar provedor cloud:**
-- Receber a imagem e identificar se é AWS ou Azure
+- Receber a imagem e identificar se é AWS, Azure ou GCP
 - Usar Claude Vision API (multimodal) para análise visual de logotipos, cores e nomenclatura
-- Output: string "AWS" ou "Azure"
+- Output: string "AWS", "Azure" ou "GCP"
 
 **Passo 2 — Detectar componentes (3 sub-etapas):**
 
@@ -41,7 +41,7 @@ O sistema deve executar os seguintes passos em sequência:
 - Cada componente recebe análise nas 6 categorias: Spoofing, Tampering, Repudiation, Information Disclosure, Denial of Service, Elevation of Privilege
 - Incluir nível de risco (Alto/Médio/Baixo) e contramedidas específicas do provedor
 - Contexto topológico: em qual grupo está, com quem se conecta, posição no fluxo de dados
-- Referenciar boas práticas (AWS Well-Architected / Azure Security Benchmark)
+- Referenciar boas práticas (AWS Well-Architected / Azure Security Benchmark / Google Cloud Architecture Framework)
 - Parser JSON robusto com 3 estratégias de fallback (clean+parse, raw extract, regex per-category)
 
 **Passo 4 — Gerar relatório:**
@@ -60,29 +60,29 @@ O sistema deve executar os seguintes passos em sequência:
 
 O sistema deve reconhecer estas categorias de componentes:
 
-- waf_firewall: AWS WAF, AWS Shield, Azure Firewall
-- cdn: Amazon CloudFront, Azure CDN
-- load_balancer: ALB, NLB, Azure Load Balancer
-- vpc_vnet: VPC, VNet, Subnet
-- compute: EC2, SEI/SIP, App Service, VM
-- auto_scaling: Auto Scaling Group, VMSS
-- orchestrator: Logic Apps, Step Functions, Lambda
-- database: RDS, Aurora, Azure SQL, Cosmos DB
-- cache: ElastiCache, Azure Cache for Redis
-- storage: S3, EFS, Azure Blob, NFS
-- api_gateway: API Gateway, Azure API Management
-- developer_portal: Developer Portal
-- web_service: REST, SOAP, SaaS Service
-- auth_identity: IAM, Microsoft Entra, Cognito
-- kms_encryption: AWS KMS, Azure Key Vault
-- monitoring: CloudWatch, CloudTrail, Azure Monitor
-- backup: AWS Backup, Azure Backup
-- messaging: SES, SQS, SNS, Azure Service Bus
+- waf_firewall: AWS WAF, AWS Shield, Azure Firewall, Cloud Armor
+- cdn: Amazon CloudFront, Azure CDN, Cloud CDN
+- load_balancer: ALB, NLB, Azure Load Balancer, Cloud Load Balancing
+- vpc_vnet: VPC, VNet, Subnet, VPC Network
+- compute: EC2, SEI/SIP, App Service, VM, Compute Engine, GKE, App Engine
+- auto_scaling: Auto Scaling Group, VMSS, Instance Groups, Autoscaler
+- orchestrator: Logic Apps, Step Functions, Lambda, Cloud Functions, Cloud Workflows
+- database: RDS, Aurora, Azure SQL, Cosmos DB, Cloud SQL, Firestore, Spanner
+- cache: ElastiCache, Azure Cache for Redis, Memorystore
+- storage: S3, EFS, Azure Blob, NFS, Cloud Storage, Filestore
+- api_gateway: API Gateway, Azure API Management, Apigee, Extensible Service Proxy
+- developer_portal: Developer Portal, API Portal
+- web_service: REST, SOAP, SaaS Service, Cloud Run
+- auth_identity: IAM, Microsoft Entra, Cognito, Cloud IAM, Identity Platform
+- kms_encryption: AWS KMS, Azure Key Vault, Cloud KMS
+- monitoring: CloudWatch, CloudTrail, Azure Monitor, Cloud Monitoring, Cloud Logging, Cloud Audit Logs
+- backup: AWS Backup, Azure Backup, Backup and DR
+- messaging: SES, SQS, SNS, Azure Service Bus, Pub/Sub, Cloud Tasks
 - user_actor: Usuário, Developer, Client
 
 ## Arquiteturas de Teste
 
-O sistema será testado com 2 imagens (disponíveis no repositório em "imagens/arquitetura 1.png" e "imagens/arquitetura 2.png"):
+O sistema será testado com 3 imagens (disponíveis no repositório em "imagens/arquitetura 1.png", "imagens/arquitetura 2.png" e "imagens/arquitetura 3.png"):
 
 **Arquitetura 1 — AWS:**
 - Camada externa: Usuários SEI → AWS Shield → Amazon CloudFront → AWS WAF
@@ -99,6 +99,15 @@ O sistema será testado com 2 imagens (disponíveis no repositório em "imagens/
 - API Management (Resource Group): API Gateway, Developer Portal, Logic Apps
 - Backend Systems: Azure Services, SaaS Services, Web Services (REST, SOAP)
 - Fluxo: 1 (User HTTP) → 2 (Entra Auth) → 3 (API Gateway) → 4 (Logic Apps) → 5 (Backend)
+
+**Arquitetura 3 — GCP:**
+- Clientes externos: Android, Chrome, iOS, Other
+- Cloud Load Balancing (entrada)
+- ESP Container (Extensible Service Proxy)
+- API Container (backend)
+- gcloud → Service Management → ESP
+- Service Control → Cloud Console
+- Fluxo: Clients → Cloud Load Balancing → ESP Container → API Container
 
 ## Stack Tecnológica
 
@@ -123,7 +132,7 @@ O projeto usa 3 notebooks no Google Colab:
 
 **01_component_detection.ipynb** (GPU T4/A100):
 1. Montar Google Drive e carregar imagem
-2. Passo 1: Claude Vision identifica provedor (AWS/Azure)
+2. Passo 1: Claude Vision identifica provedor (AWS/Azure/GCP)
 3. Passo 2a: Florence-2-large-ft detecta componentes (5 estratégias: OCR, Phrase Grounding, Region Proposal, Dense Caption, OD) + tiling 3x3 com 20% overlap
 4. Passo 2b: Claude Vision classifica cada crop com nome exato do serviço
 5. Passo 2c: Claude Vision analisa topologia (grupos, conexões, fluxo de dados)
@@ -142,7 +151,7 @@ Output: outputs/reports/stride_arquitetura_X.json e .html
 
 **03_consolidado.ipynb** (GPU T4/A100):
 1. Pipeline end-to-end completo (todos os passos 1-4)
-2. Executar para as 2 arquiteturas de teste
+2. Executar para as 3 arquiteturas de teste
 3. Visualização: imagem com bboxes numerados (#N) + resumo do relatório
 4. Métricas: tempo, componentes detectados, ameaças identificadas
 Output: Relatórios completos (JSON + HTML) + imagens anotadas
@@ -156,7 +165,8 @@ Tech-Challenge---Fase-5-Hackaton/
 ├── IADT - Fase 5 - Hackaton.pdf   # Enunciado
 ├── imagens/
 │   ├── arquitetura 1.png          # Teste AWS
-│   └── arquitetura 2.png          # Teste Azure
+│   ├── arquitetura 2.png          # Teste Azure
+│   └── arquitetura 3.png          # Teste GCP
 ├── notebooks/
 │   ├── 01_component_detection.ipynb
 │   ├── 02_stride_analysis.ipynb

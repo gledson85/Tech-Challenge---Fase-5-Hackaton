@@ -43,7 +43,7 @@ A metodologia STRIDE classifica ameaças em 6 categorias:
 ```
 Imagem de Arquitetura (.png)
         |
-  [Passo 1] Identificar provedor cloud (AWS / Azure)
+  [Passo 1] Identificar provedor cloud (AWS / Azure / GCP)
         |
   [Passo 2a] Detectar componentes visuais (Florence-2)
         |
@@ -60,14 +60,14 @@ Imagem de Arquitetura (.png)
 
 #### Passo 1 - Identificação do Provedor Cloud
 
-O sistema recebe uma imagem de diagrama de arquitetura e identifica automaticamente se pertence à AWS ou Azure. Isso é feito via análise visual de:
+O sistema recebe uma imagem de diagrama de arquitetura e identifica automaticamente se pertence à AWS, Azure ou GCP. Isso é feito via análise visual de:
 - Logotipos e ícones característicos de cada provedor
-- Paleta de cores (laranja/amarelo para AWS, azul para Azure)
+- Paleta de cores (laranja/amarelo para AWS, azul para Azure, azul/verde/vermelho para GCP)
 - Nomenclatura dos serviços presentes na imagem
 
 **Modelo utilizado**: Claude Vision API (multimodal)
 **Input**: Imagem PNG do diagrama
-**Output**: String identificando o provedor (`"AWS"` ou `"Azure"`)
+**Output**: String identificando o provedor (`"AWS"`, `"Azure"` ou `"GCP"`)
 
 #### Passo 2a - Detecção Visual de Componentes
 
@@ -98,7 +98,7 @@ O sistema recebe uma imagem de diagrama de arquitetura e identifica automaticame
 - Nome do serviço (ex: "Amazon RDS", "API Gateway")
 - Classe genérica (ex: "database", "api_gateway")
 - Bounding box (coordenadas x, y, largura, altura)
-- Provedor cloud (AWS / Azure)
+- Provedor cloud (AWS / Azure / GCP)
 
 #### Passo 2c - Análise de Topologia
 
@@ -121,7 +121,7 @@ Para cada componente detectado, o Claude API gera uma análise STRIDE completa c
 - Ameaças identificadas por categoria STRIDE (S/T/R/I/D/E)
 - Nível de risco (Alto / Médio / Baixo)
 - Contramedidas recomendadas para cada ameaça
-- Referências a boas práticas do provedor (AWS Well-Architected / Azure Security Benchmark)
+- Referências a boas práticas do provedor (AWS Well-Architected / Azure Security Benchmark / Google Cloud Architecture Framework)
 
 **Parser robusto**: 3 estratégias de fallback (clean+parse, raw extract, regex per-category) para garantir extração do JSON mesmo com variações na resposta do modelo.
 
@@ -172,36 +172,36 @@ O sistema consolida toda a análise em dois formatos:
 ```python
 CLASSES = {
     # Rede e Segurança
-    'waf_firewall':      ['AWS WAF', 'AWS Shield', 'Azure Firewall'],
-    'cdn':               ['Amazon CloudFront', 'Azure CDN'],
-    'load_balancer':     ['ALB', 'NLB', 'Azure Load Balancer'],
-    'vpc_vnet':          ['VPC', 'VNet', 'Subnet'],
+    'waf_firewall':      ['AWS WAF', 'AWS Shield', 'Azure Firewall', 'Cloud Armor'],
+    'cdn':               ['Amazon CloudFront', 'Azure CDN', 'Cloud CDN'],
+    'load_balancer':     ['ALB', 'NLB', 'Azure Load Balancer', 'Cloud Load Balancing'],
+    'vpc_vnet':          ['VPC', 'VNet', 'Subnet', 'VPC Network'],
 
     # Computação
-    'compute':           ['EC2', 'SEI/SIP', 'App Service', 'VM'],
-    'auto_scaling':      ['Auto Scaling Group', 'VMSS'],
-    'orchestrator':      ['Logic Apps', 'Step Functions', 'Lambda'],
+    'compute':           ['EC2', 'SEI/SIP', 'App Service', 'VM', 'Compute Engine', 'GKE', 'App Engine'],
+    'auto_scaling':      ['Auto Scaling Group', 'VMSS', 'Instance Groups', 'Autoscaler'],
+    'orchestrator':      ['Logic Apps', 'Step Functions', 'Lambda', 'Cloud Functions', 'Cloud Workflows'],
 
     # Dados
-    'database':          ['RDS', 'Aurora', 'Azure SQL', 'Cosmos DB'],
-    'cache':             ['ElastiCache', 'Azure Cache for Redis'],
-    'storage':           ['S3', 'EFS', 'Azure Blob', 'NFS'],
+    'database':          ['RDS', 'Aurora', 'Azure SQL', 'Cosmos DB', 'Cloud SQL', 'Firestore', 'Spanner'],
+    'cache':             ['ElastiCache', 'Azure Cache for Redis', 'Memorystore'],
+    'storage':           ['S3', 'EFS', 'Azure Blob', 'NFS', 'Cloud Storage', 'Filestore'],
 
     # API e Integração
-    'api_gateway':       ['API Gateway', 'Azure API Management'],
-    'developer_portal':  ['Developer Portal'],
-    'web_service':       ['REST', 'SOAP', 'SaaS Service'],
+    'api_gateway':       ['API Gateway', 'Azure API Management', 'Apigee', 'Extensible Service Proxy'],
+    'developer_portal':  ['Developer Portal', 'API Portal'],
+    'web_service':       ['REST', 'SOAP', 'SaaS Service', 'Cloud Run'],
 
     # Identidade e Segurança
-    'auth_identity':     ['IAM', 'Microsoft Entra', 'Cognito'],
-    'kms_encryption':    ['AWS KMS', 'Azure Key Vault'],
+    'auth_identity':     ['IAM', 'Microsoft Entra', 'Cognito', 'Cloud IAM', 'Identity Platform'],
+    'kms_encryption':    ['AWS KMS', 'Azure Key Vault', 'Cloud KMS'],
 
     # Observabilidade
-    'monitoring':        ['CloudWatch', 'CloudTrail', 'Azure Monitor'],
-    'backup':            ['AWS Backup', 'Azure Backup'],
+    'monitoring':        ['CloudWatch', 'CloudTrail', 'Azure Monitor', 'Cloud Monitoring', 'Cloud Logging', 'Cloud Audit Logs'],
+    'backup':            ['AWS Backup', 'Azure Backup', 'Backup and DR'],
 
     # Mensageria
-    'messaging':         ['SES', 'SQS', 'SNS', 'Azure Service Bus'],
+    'messaging':         ['SES', 'SQS', 'SNS', 'Azure Service Bus', 'Pub/Sub', 'Cloud Tasks'],
 
     # Atores
     'user_actor':        ['Usuário', 'Developer', 'Client'],
@@ -223,7 +223,7 @@ CLASSES = {
 
 ## 5. Arquiteturas de Teste
 
-O sistema será avaliado com duas arquiteturas de referência fornecidas no enunciado:
+O sistema será avaliado com três arquiteturas de referência:
 
 ### 5.1 Arquitetura 1 - AWS
 
@@ -266,6 +266,20 @@ Componentes presentes:
   - SaaS Services
   - Web Services (REST, SOAP)
 - **Fluxo numerado**: 1 (User HTTP) → 2 (Entra Auth) → 3 (API Gateway) → 4 (Logic Apps) → 5 (Backend Systems)
+
+### 5.3 Arquitetura 3 - GCP
+
+**Arquivo**: `imagens/arquitetura 3.png`
+
+Componentes presentes:
+- **Clientes externos**: Android, Chrome, iOS, Other
+- **Cloud Load Balancing**: Balanceamento de carga na entrada
+- **ESP Container**: Extensible Service Proxy (autenticação e controle de API)
+- **API Container**: Backend da aplicação
+- **Gerenciamento de serviços**:
+  - gcloud → Service Management → ESP
+  - Service Control → Cloud Console
+- **Fluxo**: Clients → Cloud Load Balancing → ESP Container → API Container
 
 ---
 
@@ -333,7 +347,8 @@ Tech-Challenge---Fase-5-Hackaton/
 ├── IADT - Fase 5 - Hackaton.pdf       # Enunciado do projeto
 ├── imagens/
 │   ├── arquitetura 1.png              # Diagrama AWS (teste)
-│   └── arquitetura 2.png              # Diagrama Azure (teste)
+│   ├── arquitetura 2.png              # Diagrama Azure (teste)
+│   └── arquitetura 3.png              # Diagrama GCP (teste)
 ├── notebooks/
 │   ├── 01_component_detection.ipynb   # Detecção de componentes + topologia
 │   ├── 02_stride_analysis.ipynb       # Análise STRIDE + relatório
@@ -377,7 +392,7 @@ Antes de executar qualquer notebook no Google Colab:
 
 **Etapas**:
 1. Montar Google Drive e carregar imagem de teste
-2. **Passo 1 - Identificar provedor**: Enviar imagem ao Claude Vision API com prompt para identificar se é AWS ou Azure
+2. **Passo 1 - Identificar provedor**: Enviar imagem ao Claude Vision API com prompt para identificar se é AWS, Azure ou GCP
 3. **Passo 2a - Detecção visual**: Carregar Florence-2 (`microsoft/Florence-2-large-ft`) e executar detecção com 5 estratégias (OCR, Phrase Grounding, Region Proposal, Dense Caption, OD) na imagem completa + tiling 3x3 com 20% overlap
 4. **Passo 2b - Classificação**: Recortar cada região detectada (crop dos bounding boxes) e enviar ao Claude Vision para classificação refinada com nome exato do serviço. Deduplicação espacial por proximidade (centros < 100px).
 5. **Passo 2c - Topologia**: Enviar imagem completa + lista de componentes ao Claude Vision para identificar grupos (VPC, Subnets, AZs), conexões entre componentes e fluxo de dados end-to-end
@@ -417,12 +432,12 @@ Antes de executar qualquer notebook no Google Colab:
 
 **Etapas**:
 1. Pipeline end-to-end: recebe imagem → identifica provedor → detecta componentes → analisa topologia → analisa STRIDE → gera relatório
-2. Executar para as duas arquiteturas de teste (AWS e Azure)
+2. Executar para as três arquiteturas de teste (AWS, Azure e GCP)
 3. Visualização com bounding boxes numerados (#N) + resumo do relatório
 4. Métricas de execução: tempo de processamento por etapa, número de componentes detectados, número de ameaças identificadas
 5. Estimativa de custo por imagem
 
-**Output**: Relatórios completos para ambas as arquiteturas (JSON + HTML + imagens anotadas)
+**Output**: Relatórios completos para as três arquiteturas (JSON + HTML + imagens anotadas)
 
 ---
 
@@ -456,6 +471,7 @@ Conforme definido no enunciado:
 - [Claude Vision API (Anthropic)](https://platform.claude.com/docs/en/build-with-claude/vision)
 - [AWS Well-Architected Framework - Security Pillar](https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/welcome.html)
 - [Azure Security Benchmark - Microsoft](https://learn.microsoft.com/en-us/security/benchmark/azure/overview)
+- [Google Cloud Architecture Framework - Security](https://cloud.google.com/architecture/framework/security)
 - [Supervision - Roboflow](https://supervision.roboflow.com/)
 - [Google Colab](https://colab.google/)
 - [Ultralytics YOLO](https://docs.ultralytics.com/)
