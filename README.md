@@ -80,7 +80,7 @@ O sistema recebe uma imagem de diagrama de arquitetura e identifica automaticame
   - `DENSE_REGION_CAPTION`: regiões com legenda densa
   - `OD`: detecção de objetos (complementar)
 - Tiling 3x3 com 20% de overlap: repete todas as estratégias em cada tile para capturar componentes menores
-- Filtros para diagramas técnicos (min_area_ratio=0.0005, max_area_ratio=0.05, min_size=5px)
+- Filtros para diagramas técnicos (min_area_ratio=0.0005, max_area_ratio=0.03, min_size=5px)
 - NMS (Non-Maximum Suppression) com IoU > 0.5 para remover duplicatas
 
 **Input**: Imagem PNG do diagrama
@@ -363,7 +363,7 @@ Tech-Challenge---Fase-5-Hackaton/
 ```
 MyDrive/
 └── hackaton-stride/
-    ├── test_images/                   # Imagens de teste (arquitetura 1 e 2)
+    ├── test_images/                   # Imagens de teste (arquitetura 1, 2 e 3)
     └── outputs/
         ├── detections/                # Resultados da detecção + imagens anotadas
         └── reports/                   # Relatórios gerados (JSON + HTML)
