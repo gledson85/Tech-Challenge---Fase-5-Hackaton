@@ -38,25 +38,49 @@ A metodologia STRIDE classifica ameaças em 6 categorias:
 
 ## 3. Arquitetura da Solução
 
-### 3.1 Pipeline Completo
+### 3.1 Pipeline com Claude API (Notebooks 01, 02 e 03)
+
+Os notebooks 01 e 02 executam o pipeline em etapas separadas (detecção e análise STRIDE, respectivamente). O notebook 03 consolida todo o pipeline end-to-end em um único notebook.
 
 ```
 Imagem de Arquitetura (.png)
         |
-  [Passo 1] Identificar provedor cloud (AWS / Azure / GCP)
+  [Passo 1] Identificar provedor cloud — Claude Vision API
         |
-  [Passo 2a] Detectar componentes visuais (Florence-2)
+  [Passo 2a] Detectar componentes visuais — Florence-2 (local)
         |
-  [Passo 2b] Classificar componentes (Claude Vision)
+  [Passo 2b] Classificar componentes — Claude Vision API
         |
-  [Passo 2c] Analisar topologia (Claude Vision)
+  [Passo 2c] Analisar topologia — Claude Vision API
         |
-  [Passo 3] Análise STRIDE por componente (Claude API)
+  [Passo 3] Análise STRIDE por componente — Claude API
         |
   [Passo 4] Relatório de Ameaças (JSON + HTML)
 ```
 
-### 3.2 Detalhamento dos Passos
+### 3.2 Pipeline Local (Notebook 04)
+
+O notebook 04 executa o mesmo pipeline, substituindo todas as chamadas ao Claude API pelo modelo open-source **Qwen2.5-VL-72B-Instruct-AWQ** rodando localmente na GPU. Custo de API = US$ 0,00.
+
+```
+Imagem de Arquitetura (.png)
+        |
+  [Passo 1] Identificar provedor cloud — Qwen2.5-VL-72B (local)
+        |
+  [Passo 2a] Detectar componentes visuais — Florence-2 (local)
+        |
+  [Passo 2b] Classificar componentes — Qwen2.5-VL-72B (local)
+        |
+  [Passo 2c] Analisar topologia — Qwen2.5-VL-72B (local)
+        |
+  [Passo 3] Análise STRIDE por componente — Qwen2.5-VL-72B (local)
+        |
+  [Passo 4] Relatório de Ameaças (JSON + HTML)
+```
+
+> Requer GPU A100 com alta memória (80 GB) — VRAM mínima ~42 GB.
+
+### 3.3 Detalhamento dos Passos
 
 #### Passo 1 - Identificação do Provedor Cloud
 
