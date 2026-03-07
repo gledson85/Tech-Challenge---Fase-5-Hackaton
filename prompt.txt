@@ -10,7 +10,7 @@ O sistema deve executar os seguintes passos em sequência:
 
 **Passo 1 — Identificar provedor cloud:**
 - Receber a imagem e identificar se é AWS, Azure ou GCP
-- Usar Claude Vision API (multimodal) para análise visual de logotipos, cores e nomenclatura
+- Notebooks 01-03: Claude Vision API (multimodal) | Notebook 04: Qwen2.5-VL-72B (local)
 - Output: string "AWS", "Azure" ou "GCP"
 
 **Passo 2 — Detectar componentes (3 sub-etapas):**
@@ -26,28 +26,31 @@ O sistema deve executar os seguintes passos em sequência:
 - Filtros para diagramas (min_area_ratio=0.0005, max_area_ratio=0.03, min_size=5px)
 - NMS (IoU > 0.5) para remover duplicatas geométricas
 
-*Passo 2b — Classificação com Claude Vision:*
-- Recortar cada região detectada (crop) e enviar ao Claude Vision API para classificação refinada com nome exato do serviço cloud
+*Passo 2b — Classificação:*
+- Recortar cada região detectada (crop) e classificar com nome exato do serviço cloud
+- Notebooks 01-03: Claude Vision API | Notebook 04: Qwen2.5-VL-72B (local)
 - Deduplicação espacial pós-classificação: agrupa por nome, clusteriza por proximidade (centros < 100px), mantém menor bbox por cluster
 - Output: lista JSON de componentes com nome, classe genérica, bounding box e provedor
 
-*Passo 2c — Análise de topologia com Claude Vision:*
-- Enviar imagem completa + lista de componentes ao Claude Vision
+*Passo 2c — Análise de topologia:*
+- Enviar imagem completa + lista de componentes para análise topológica
+- Notebooks 01-03: Claude Vision API | Notebook 04: Qwen2.5-VL-72B (local)
 - Identificar: grupos/containers (VPC, Subnets, AZs), conexões entre componentes, fluxo de dados end-to-end
 - Output: JSON com groups, connections e data_flow
 
 **Passo 3 — Análise STRIDE (com contexto topológico):**
-- Para cada componente detectado, usar Claude API para gerar análise STRIDE completa
+- Para cada componente detectado, gerar análise STRIDE completa
+- Notebooks 01-03: Claude API | Notebook 04: Qwen2.5-VL-72B (local)
 - Cada componente recebe análise nas 6 categorias: Spoofing, Tampering, Repudiation, Information Disclosure, Denial of Service, Elevation of Privilege
 - Incluir nível de risco (Alto/Médio/Baixo) e contramedidas específicas do provedor
 - Contexto topológico: em qual grupo está, com quem se conecta, posição no fluxo de dados
 - Referenciar boas práticas (AWS Well-Architected / Azure Security Benchmark / Google Cloud Architecture Framework)
 - Parser JSON robusto com 3 estratégias de fallback (clean+parse, raw extract, regex per-category)
+- Responder em português do Brasil
 
 **Passo 4 — Gerar relatório:**
 - JSON estruturado (para integração) — inclui topologia e análise STRIDE
 - HTML formatado (para apresentação) com CSS inline, sem dependências externas:
-  - Capa com gradiente Material Blue e título branco
   - Resumo executivo com badges de risco coloridas (Alto=vermelho, Médio=amarelo, Baixo=verde)
   - Imagens da arquitetura embutidas em base64 (original + anotada com bboxes numerados)
   - Seção de topologia: fluxo de dados visual, grupos/containers, tabela de conexões
@@ -58,7 +61,7 @@ O sistema deve executar os seguintes passos em sequência:
 
 ## Classes de Detecção
 
-O sistema deve reconhecer estas categorias de componentes:
+O sistema deve reconhecer estas categorias de componentes (19 classes):
 
 - waf_firewall: AWS WAF, AWS Shield, Azure Firewall, Cloud Armor
 - cdn: Amazon CloudFront, Azure CDN, Cloud CDN
@@ -82,7 +85,7 @@ O sistema deve reconhecer estas categorias de componentes:
 
 ## Arquiteturas de Teste
 
-O sistema será testado com 3 imagens (disponíveis no repositório em "imagens/arquitetura 1.png", "imagens/arquitetura 2.png" e "imagens/arquitetura 3.png"):
+O sistema será testado com imagens disponíveis no repositório em "imagens/arquitetura *.png". Os notebooks 03 e 04 detectam automaticamente as imagens disponíveis na pasta do Google Drive.
 
 **Arquitetura 1 — AWS:**
 - Camada externa: Usuários SEI → AWS Shield → Amazon CloudFront → AWS WAF
@@ -114,46 +117,71 @@ O sistema será testado com 3 imagens (disponíveis no repositório em "imagens/
 - Ambiente: Google Colab Pro (GPU T4/A100)
 - Linguagem: Python 3.11
 - Storage: Google Drive
-- Bibliotecas: transformers, anthropic, supervision, torch, Pillow, matplotlib, timm, einops
+- Bibliotecas (notebooks 01-03): transformers, anthropic, supervision, torch, Pillow, matplotlib, timm, einops
+- Bibliotecas adicionais (notebook 04): accelerate, autoawq, qwen-vl-utils
 - Nota: flash_attn (Flash Attention) não é utilizada — a compilação falha no Colab por incompatibilidade com CUDA. Florence-2 funciona normalmente sem ela, usando atenção padrão do PyTorch.
-- Modelos: Florence-2-large-ft (Microsoft, fine-tuned) + Claude Sonnet 4.6 (Anthropic)
 
-## Configuração Necessária no Google Colab
+### Modelos de IA
 
-Antes de executar qualquer notebook:
-1. No menu lateral do Colab, em 🔑 Secrets, adicionar: ANTHROPIC_API_KEY (chave da API Anthropic)
-2. No menu Ambiente de execução > Alterar tipo:
+| Modelo | Provedor | Parâmetros | Uso |
+|--------|----------|-----------|-----|
+| Florence-2-large-ft | Microsoft | 770M | Detecção visual de componentes (todos os notebooks) |
+| Claude Sonnet 4.6 | Anthropic | — | Classificação, topologia, STRIDE (notebooks 01-03) |
+| Qwen2.5-VL-72B-Instruct-AWQ | Alibaba/Qwen | 72B (4-bit) | Substituto local do Claude API (notebook 04, ~40 GB VRAM) |
+
+## Requisitos de Hardware e Configuração no Google Colab
+
+| Notebook | GPU | VRAM Mínima | API Key | Observações |
+|----------|-----|-------------|---------|-------------|
+| 01 - Detecção de Componentes | T4 ou A100 | ~4 GB | Anthropic | Florence-2 + Claude API |
+| 02 - Análise STRIDE | CPU suficiente | — | Anthropic | Apenas chamadas API |
+| 03 - Pipeline Consolidado | T4 ou A100 | ~4 GB | Anthropic | Florence-2 + Claude API |
+| 04 - Pipeline Local | A100 80 GB | ~42 GB | Nenhuma | Florence-2 + Qwen2.5-VL-72B-AWQ |
+
+Configuração antes de executar:
+1. Secrets (notebooks 01, 02 e 03): No menu lateral do Colab, em 🔑 Secrets, adicionar ANTHROPIC_API_KEY. O notebook 04 não requer chave de API.
+2. Ambiente de execução > Alterar tipo:
    - nb01 e nb03: GPU T4 (gratuita) ou A100 (Pro) — necessário para Florence-2
    - nb02: CPU é suficiente (apenas chamadas API)
+   - nb04: GPU A100 com alta memória (80 GB) — nos testes foi necessário ao menos 42 GB de VRAM
 
 ## Estrutura de Notebooks
 
-O projeto usa 3 notebooks no Google Colab:
+O projeto usa 4 notebooks no Google Colab:
 
-**01_component_detection.ipynb** (GPU T4/A100):
+**01_component_detection.ipynb** (GPU T4/A100, ~4 GB VRAM):
 1. Montar Google Drive e carregar imagem
 2. Passo 1: Claude Vision identifica provedor (AWS/Azure/GCP)
-3. Passo 2a: Florence-2-large-ft detecta componentes (5 estratégias: OCR, Phrase Grounding, Region Proposal, Dense Caption, OD) + tiling 3x3 com 20% overlap
+3. Passo 2a: Florence-2-large-ft detecta componentes (5 estratégias + tiling 3x3 com 20% overlap)
 4. Passo 2b: Claude Vision classifica cada crop com nome exato do serviço
 5. Passo 2c: Claude Vision analisa topologia (grupos, conexões, fluxo de dados)
 6. Salvar JSON com componentes detectados e topologia
 7. Visualizar bboxes numerados (#N) com supervision
 Output: outputs/detections/componentes_arquitetura_X.json + annotated_arquitetura_X.png
 
-**02_stride_analysis.ipynb** (sem GPU, CPU suficiente):
+**02_stride_analysis.ipynb** (CPU suficiente):
 1. Carregar JSON de componentes (inclui topologia)
 2. Montar prompt STRIDE contextualizado por componente (com posição topológica, conexões, fluxo)
-3. Claude API gera análise STRIDE completa
+3. Claude API gera análise STRIDE completa (em português do Brasil)
 4. Gerar contramedidas específicas
 5. Consolidar JSON
 6. Gerar HTML com imagens base64, topologia, localização e conexões por componente
 Output: outputs/reports/stride_arquitetura_X.json e .html
 
-**03_consolidado.ipynb** (GPU T4/A100):
-1. Pipeline end-to-end completo (todos os passos 1-4)
-2. Executar para as 3 arquiteturas de teste
+**03_consolidado.ipynb** (GPU T4/A100, ~4 GB VRAM):
+1. Pipeline end-to-end completo (todos os passos 1-4) usando Claude API
+2. Detecta automaticamente as imagens disponíveis na pasta do Google Drive
 3. Visualização: imagem com bboxes numerados (#N) + resumo do relatório
 4. Métricas: tempo, componentes detectados, ameaças identificadas
+5. Estimativa de custo (Claude API + Colab GPU)
+Output: Relatórios completos (JSON + HTML) + imagens anotadas
+
+**04_local_pipeline.ipynb** (GPU A100 80 GB, ~42 GB VRAM):
+1. Mesmo pipeline end-to-end do nb03, substituindo Claude API por Qwen2.5-VL-72B-Instruct-AWQ (local)
+2. Gestão de memória GPU: carrega/descarrega Florence-2 e Qwen conforme necessário
+3. Detecta automaticamente as imagens disponíveis na pasta do Google Drive
+4. Visualização, métricas e comparativo de custo (API vs local)
+5. Custo de API = US$ 0,00. Fallback: Qwen2.5-VL-7B-Instruct se 72B não estiver disponível
 Output: Relatórios completos (JSON + HTML) + imagens anotadas
 
 ## Estrutura de Pastas
@@ -170,7 +198,8 @@ Tech-Challenge---Fase-5-Hackaton/
 ├── notebooks/
 │   ├── 01_component_detection.ipynb
 │   ├── 02_stride_analysis.ipynb
-│   └── 03_consolidado.ipynb
+│   ├── 03_consolidado.ipynb
+│   └── 04_local_pipeline.ipynb
 └── outputs/
     ├── detections/
     └── reports/
@@ -185,20 +214,6 @@ MyDrive/hackaton-stride/
     └── reports/                   # Relatórios JSON + HTML
 ```
 
-## Backlog Opcional (se sobrar tempo)
-
-- Construir dataset de imagens de diagramas de arquitetura
-- Anotar no Roboflow com as classes definidas
-- Fine-tuning YOLOv8
-- Avaliar com métricas: mAP, Precision, Recall, F1-Score
-- Comparar modelo treinado vs. abordagem zero-shot
-
-## Entregáveis
-
-- Documentação (README + notebooks)
-- Vídeo de até 15 minutos
-- Link do GitHub
-
 ## Instruções
 
-Comece gerando os notebooks na ordem (01, 02, 03), todos preparados para rodar no Google Colab Pro. Cada notebook deve ser autocontido: instalar dependências, montar Drive, e executar seu passo do pipeline. Use código Python limpo, bem comentado em português, e com tratamento de erros adequado.
+Comece gerando os notebooks na ordem (01, 02, 03, 04), todos preparados para rodar no Google Colab Pro. Cada notebook deve ser autocontido: instalar dependências, montar Drive, e executar seu passo do pipeline. Use código Python limpo, bem comentado em português, e com tratamento de erros adequado.

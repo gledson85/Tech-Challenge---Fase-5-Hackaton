@@ -82,6 +82,8 @@ Imagem de Arquitetura (.png)
 
 ### 3.3 Detalhamento dos Passos
 
+> Os passos abaixo são comuns a ambos os pipelines. Nos notebooks 01-03 as etapas de classificação e análise usam **Claude API**; no notebook 04 usam **Qwen2.5-VL-72B** localmente.
+
 #### Passo 1 - Identificação do Provedor Cloud
 
 O sistema recebe uma imagem de diagrama de arquitetura e identifica automaticamente se pertence à AWS, Azure ou GCP. Isso é feito via análise visual de:
@@ -89,7 +91,7 @@ O sistema recebe uma imagem de diagrama de arquitetura e identifica automaticame
 - Paleta de cores (laranja/amarelo para AWS, azul para Azure, azul/verde/vermelho para GCP)
 - Nomenclatura dos serviços presentes na imagem
 
-**Modelo utilizado**: Claude Vision API (multimodal)
+**Modelo utilizado**: Claude Vision API (notebooks 01-03) ou Qwen2.5-VL-72B (notebook 04)
 **Input**: Imagem PNG do diagrama
 **Output**: String identificando o provedor (`"AWS"`, `"Azure"` ou `"GCP"`)
 
@@ -112,7 +114,7 @@ O sistema recebe uma imagem de diagrama de arquitetura e identifica automaticame
 
 #### Passo 2b - Classificação de Componentes
 
-**Claude Vision API** (classificação refinada):
+**Claude Vision API** (notebooks 01-03) ou **Qwen2.5-VL-72B** (notebook 04):
 - Recebe os recortes (crops) de cada bounding box detectado pelo Florence-2
 - Classifica cada componente com nome específico do serviço cloud
 - Deduplicação espacial pós-classificação: agrupa por nome, clusteriza por proximidade (centros < 100px), mantém menor bbox por cluster
@@ -126,7 +128,7 @@ O sistema recebe uma imagem de diagrama de arquitetura e identifica automaticame
 
 #### Passo 2c - Análise de Topologia
 
-**Claude Vision API** (análise topológica):
+**Claude Vision API** (notebooks 01-03) ou **Qwen2.5-VL-72B** (notebook 04):
 - Recebe a imagem completa + lista de componentes detectados
 - Identifica a estrutura organizacional do diagrama:
   - **Grupos/containers**: VPC, Subnets, Availability Zones, Resource Groups
@@ -138,7 +140,7 @@ O sistema recebe uma imagem de diagrama de arquitetura e identifica automaticame
 
 #### Passo 3 - Análise STRIDE
 
-Para cada componente detectado, o Claude API gera uma análise STRIDE completa com contexto topológico:
+Para cada componente detectado, o modelo de IA (Claude API nos notebooks 01-03, Qwen2.5-VL-72B no notebook 04) gera uma análise STRIDE completa com contexto topológico:
 
 **Input**: Componente + lista completa de componentes + provedor + topologia (grupo, conexões, posição no fluxo)
 **Output**: Para cada componente:
@@ -343,6 +345,10 @@ Componentes presentes:
 | **Qwen2.5-VL-72B-Instruct-AWQ** | Alibaba/Qwen | 72B (4-bit) | Substituto local do Claude API no notebook 04 (~40 GB VRAM) |
 
 ### 6.4 Estimativa de Custo por Imagem Analisada
+
+> **Notebook 04 (pipeline local)**: Custo de API = **US$ 0,00**. Requer apenas GPU A100 80 GB do Colab Pro (~US$ 0,10/hora).
+
+Custos abaixo referem-se aos **notebooks 01-03** (pipeline com Claude API).
 
 Preços base do Claude Sonnet 4.6: **$3.00 / 1M tokens de input** e **$15.00 / 1M tokens de output**.
 
