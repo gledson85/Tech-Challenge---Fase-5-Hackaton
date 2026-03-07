@@ -154,7 +154,6 @@ O sistema consolida toda a análise em dois formatos:
 ```
 
 **HTML formatado**: Para apresentação e documentação, contendo:
-- Capa com gradiente Material Blue e título branco
 - Resumo executivo com badges coloridas de risco (Alto=vermelho, Médio=amarelo, Baixo=verde)
 - Imagens da arquitetura embutidas em base64 (original + anotada com bboxes numerados)
 - Seção de topologia: fluxo de dados visual com chips, grupos/containers hierárquicos, tabela de conexões
@@ -299,7 +298,9 @@ Componentes presentes:
 | Biblioteca | Uso |
 |-----------|-----|
 | `transformers` | Florence-2 (detecção de componentes) |
-| `anthropic` | Claude API (classificação, topologia, STRIDE) |
+| `anthropic` | Claude API — classificação, topologia, STRIDE (notebooks 01-03) |
+| `autoawq` | Quantização AWQ para Qwen2.5-VL-72B (notebook 04) |
+| `qwen-vl-utils` | Processamento de imagens para Qwen2.5-VL (notebook 04) |
 | `supervision` | Visualização de bounding boxes numerados |
 | `timm` | Dependência do Florence-2 (modelos de visão) |
 | `einops` | Dependência do Florence-2 (operações tensoriais) |
@@ -314,7 +315,8 @@ Componentes presentes:
 | Modelo | Provedor | Parâmetros | Uso no Projeto |
 |--------|----------|-----------|----------------|
 | **Florence-2-large-ft** | Microsoft | 770M | Detecção zero-shot de componentes visuais (bounding boxes) |
-| **Claude Sonnet 4.6** | Anthropic | - | Identificação de provedor, classificação de componentes, análise de topologia, análise STRIDE |
+| **Claude Sonnet 4.6** | Anthropic | — | Identificação de provedor, classificação, topologia, STRIDE (notebooks 01-03) |
+| **Qwen2.5-VL-72B-Instruct-AWQ** | Alibaba/Qwen | 72B (4-bit) | Substituto local do Claude API no notebook 04 (~40 GB VRAM) |
 
 ### 6.4 Estimativa de Custo por Imagem Analisada
 
@@ -352,7 +354,8 @@ Tech-Challenge---Fase-5-Hackaton/
 ├── notebooks/
 │   ├── 01_component_detection.ipynb   # Detecção de componentes + topologia
 │   ├── 02_stride_analysis.ipynb       # Análise STRIDE + relatório
-│   └── 03_consolidado.ipynb           # Pipeline consolidado end-to-end
+│   ├── 03_consolidado.ipynb           # Pipeline consolidado end-to-end (Claude API)
+│   └── 04_local_pipeline.ipynb        # Pipeline 100% local (sem API, Qwen2.5-VL)
 └── outputs/
     ├── detections/                    # JSONs + imagens anotadas com bboxes
     └── reports/                       # Relatórios STRIDE (JSON + HTML)
@@ -375,20 +378,33 @@ MyDrive/
 
 ## 8. Notebooks
 
-### Configuração Necessária (todos os notebooks)
+### Requisitos de Hardware
+
+| Notebook | GPU | VRAM Mínima | API Key | Observações |
+|----------|-----|-------------|---------|-------------|
+| **01** - Detecção de Componentes | T4 ou A100 | ~4 GB | Anthropic | Florence-2 (~1.5 GB) + Claude API |
+| **02** - Análise STRIDE | CPU suficiente | — | Anthropic | Apenas chamadas API, sem modelo local |
+| **03** - Pipeline Consolidado | T4 ou A100 | ~4 GB | Anthropic | Florence-2 + Claude API |
+| **04** - Pipeline Local | **A100 80 GB** | **~42 GB** | Nenhuma | Florence-2 (~1.5 GB) + Qwen2.5-VL-72B-AWQ (~40 GB) |
+
+### Configuração Necessária
 
 Antes de executar qualquer notebook no Google Colab:
 
-1. **Secrets**: No menu lateral do Colab, clique em 🔑 **Secrets** e adicione:
+1. **Secrets** (notebooks 01, 02 e 03): No menu lateral do Colab, clique em 🔑 **Secrets** e adicione:
    - `ANTHROPIC_API_KEY`: Chave de API da Anthropic (obtenha em https://console.anthropic.com)
+   - O notebook 04 **não** requer chave de API.
 
 2. **Ambiente de execução**: No menu **Ambiente de execução > Alterar tipo de ambiente de execução**:
    - **Notebooks 01 e 03**: Selecione **GPU T4** (gratuita) ou **A100** (Colab Pro) — necessário para Florence-2
    - **Notebook 02**: **CPU** é suficiente (apenas chamadas API). Funciona também com GPU, mas não é necessário.
+   - **Notebook 04**: Selecione **GPU A100 com alta memória (80 GB)** (Colab Pro) — nos testes foi necessário ao menos 42 GB de VRAM para carregar o Qwen2.5-VL-72B-AWQ
+
+> Os notebooks 03 e 04 detectam automaticamente as imagens disponíveis na pasta `test_images/` do Google Drive (padrão `arquitetura *.png`) e processam todas elas, sem necessidade de ajustar o código para adicionar ou remover imagens.
 
 ### 8.1 Notebook 01 - Detecção de Componentes (`01_component_detection.ipynb`)
 
-**GPU necessária**: T4 ou A100
+**GPU necessária**: T4 ou A100 | **VRAM**: ~4 GB
 
 **Etapas**:
 1. Montar Google Drive e carregar imagem de teste
@@ -405,7 +421,7 @@ Antes de executar qualquer notebook no Google Colab:
 
 ### 8.2 Notebook 02 - Análise STRIDE (`02_stride_analysis.ipynb`)
 
-**GPU necessária**: Nenhuma (CPU suficiente)
+**GPU necessária**: Nenhuma (CPU suficiente) | **VRAM**: —
 
 **Etapas**:
 1. Carregar JSON de componentes detectados (inclui topologia)
@@ -428,42 +444,45 @@ Antes de executar qualquer notebook no Google Colab:
 
 ### 8.3 Notebook 03 - Pipeline Consolidado (`03_consolidado.ipynb`)
 
-**GPU necessária**: T4 ou A100
+**GPU necessária**: T4 ou A100 | **VRAM**: ~4 GB
 
 **Etapas**:
 1. Pipeline end-to-end: recebe imagem → identifica provedor → detecta componentes → analisa topologia → analisa STRIDE → gera relatório
-2. Executar para as três arquiteturas de teste (AWS, Azure e GCP)
+2. Detecta automaticamente as imagens disponíveis na pasta do Google Drive e processa todas
 3. Visualização com bounding boxes numerados (#N) + resumo do relatório
 4. Métricas de execução: tempo de processamento por etapa, número de componentes detectados, número de ameaças identificadas
-5. Estimativa de custo por imagem
+5. Estimativa de custo por imagem (Claude API + Colab GPU)
 
-**Output**: Relatórios completos para as três arquiteturas (JSON + HTML + imagens anotadas)
+**Output**: Relatórios completos para cada arquitetura (JSON + HTML + imagens anotadas)
+
+### 8.4 Notebook 04 - Pipeline Local (`04_local_pipeline.ipynb`)
+
+**GPU necessária**: A100 80 GB (Colab Pro) | **VRAM**: ~42 GB
+
+Pipeline 100% local que substitui todas as chamadas ao Claude API por **Qwen2.5-VL-72B-Instruct-AWQ** (modelo open-source). Custo de API = **US$ 0,00** — requer apenas GPU.
+
+| Papel | Modelo no nb03 (API) | Modelo no nb04 (local) |
+|-------|----------------------|------------------------|
+| Identificar provedor | Claude Sonnet 4.6 (vision) | Qwen2.5-VL-72B-Instruct-AWQ |
+| Detecção visual | Florence-2-large-ft | Florence-2-large-ft (mesmo) |
+| Classificar componentes | Claude Sonnet 4.6 (vision) | Qwen2.5-VL-72B-Instruct-AWQ |
+| Analisar topologia | Claude Sonnet 4.6 (vision) | Qwen2.5-VL-72B-Instruct-AWQ |
+| Análise STRIDE | Claude Sonnet 4.6 (text) | Qwen2.5-VL-72B-Instruct-AWQ |
+
+**Gestão de memória GPU**: Florence-2 (~1.5 GB) e Qwen2.5-VL-72B-AWQ (~40 GB) não cabem simultaneamente. O pipeline carrega/descarrega os modelos conforme necessário, liberando VRAM entre etapas.
+
+**Fallback**: Se o modelo 72B não estiver disponível, utiliza automaticamente `Qwen2.5-VL-7B-Instruct`.
+
+**Etapas**:
+1. Mesmo pipeline do nb03, substituindo chamadas Claude API por inferência local no VLM
+2. Detecta automaticamente as imagens disponíveis na pasta do Google Drive e processa todas
+3. Visualização, métricas e comparativo de custo (API vs local)
+
+**Output**: Relatórios completos para cada arquitetura (JSON + HTML + imagens anotadas)
 
 ---
 
-## 9. Backlog (Opcional - Se Sobrar Tempo)
-
-Requisito acadêmico de treinamento supervisionado:
-
-- [ ] Construir dataset de imagens de diagramas de arquitetura de software
-- [ ] Anotar dataset no Roboflow com as classes definidas na seção 4.1
-- [ ] Fine-tuning do YOLOv8 com o dataset anotado
-- [ ] Avaliar modelo com métricas: mAP, Precision, Recall, F1-Score
-- [ ] Comparar resultados do modelo treinado vs. abordagem zero-shot (Florence-2)
-
----
-
-## 10. Entregáveis
-
-Conforme definido no enunciado:
-
-- [ ] **Documentação**: Este README + documentação nos notebooks
-- [ ] **Vídeo**: Até 15 minutos explicando a solução proposta
-- [ ] **Link do GitHub**: Este repositório
-
----
-
-## 11. Referências
+## 9. Referências
 
 - [Metodologia STRIDE - Microsoft](https://learn.microsoft.com/en-us/azure/security/develop/threat-modeling-tool-threats)
 - [Florence-2-large-ft - Microsoft (Hugging Face)](https://huggingface.co/microsoft/Florence-2-large-ft)
@@ -472,6 +491,6 @@ Conforme definido no enunciado:
 - [AWS Well-Architected Framework - Security Pillar](https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/welcome.html)
 - [Azure Security Benchmark - Microsoft](https://learn.microsoft.com/en-us/security/benchmark/azure/overview)
 - [Google Cloud Architecture Framework - Security](https://cloud.google.com/architecture/framework/security)
+- [Qwen2.5-VL - Alibaba (Hugging Face)](https://huggingface.co/Qwen/Qwen2.5-VL-72B-Instruct-AWQ)
 - [Supervision - Roboflow](https://supervision.roboflow.com/)
 - [Google Colab](https://colab.google/)
-- [Ultralytics YOLO](https://docs.ultralytics.com/)
